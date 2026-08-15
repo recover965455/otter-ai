@@ -154,13 +154,18 @@ pub fn create_assistant_message_event_stream() -> AssistantMessageEventStream {
     fn extract_result_evt(event: &AssistantMessageEvent) -> AssistantMessage {
         match event {
             AssistantMessageEvent::Done { message, .. } => message.clone(),
-            AssistantMessageEvent::Error { error } => Message::Assistant {
-                content: vec![],
-                usage: Default::default(),
-                model: None,
-                stop_reason: Some(format!("error: {}", error)),
-                timestamp: chrono::Utc::now().timestamp_millis(),
-            },
+            AssistantMessageEvent::Error { error, reason } => {
+                let mut m = Message::assistant_default("unknown".into(), "unknown".into());
+                if let Message::Assistant {
+                    ref mut stop_reason,
+                    ref mut error_message,
+                    ..
+                } = m {
+                    *stop_reason = Some(reason.clone());
+                    *error_message = Some(error.clone());
+                }
+                m
+            }
             _ => panic!("unexpected event type for final result"),
         }
     }

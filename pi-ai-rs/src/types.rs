@@ -21,12 +21,24 @@ pub enum KnownApi {
     PiMessages,
 }
 
+// ---- Cost tier (TS: model.cost.tiers) ----
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CostTier {
+    pub input_tokens_above: u64,
+    pub input_per_million: f64,
+    pub output_per_million: f64,
+    pub cache_read_per_million: f64,
+    pub cache_write_per_million: f64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ModelCostRates {
     pub input_per_million: Option<f64>,
     pub output_per_million: Option<f64>,
     pub input_cache_read_per_million: Option<f64>,
     pub input_cache_write_per_million: Option<f64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tiers: Vec<CostTier>,
 }
 
 impl Default for ModelCostRates {
@@ -36,6 +48,7 @@ impl Default for ModelCostRates {
             output_per_million: None,
             input_cache_read_per_million: None,
             input_cache_write_per_million: None,
+            tiers: vec![],
         }
     }
 }
@@ -53,8 +66,9 @@ pub struct UsageCost {
 pub struct Usage {
     pub input: u64,
     pub output: u64,
-    pub cache_read_input: u64,
-    pub cache_write_input: u64,
+    pub cache_read: u64,
+    pub cache_write: u64,
+    pub total_tokens: u64,
     pub cost: UsageCost,
 }
 
@@ -88,6 +102,7 @@ pub struct Model {
     pub supports_structured_output: bool,
     pub supports_system_prompt: bool,
     pub thinking: ModelThinkingLevel,
+    pub reasoning: bool,
     pub cost_rates: ModelCostRates,
     pub context_window: Option<u64>,
     pub default_temperature: Option<f32>,
@@ -116,6 +131,11 @@ pub enum ContentBlock {
     Text {
         text: String,
     },
+    Thinking {
+        thinking: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        signature: Option<String>,
+    },
     ToolCall {
         id: String,
         name: String,
@@ -130,11 +150,6 @@ pub enum ContentBlock {
         is_error: bool,
     },
     Image(ImageContent),
-    Thinking {
-        thinking: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        signature: Option<String>,
-    },
 }
 
 fn default_timestamp() -> i64 {
@@ -153,12 +168,17 @@ pub enum Message {
     #[serde(rename = "assistant")]
     Assistant {
         content: Vec<ContentBlock>,
+        api: Api,
+        provider: ProviderId,
+        model: Option<String>,
         #[serde(default)]
         usage: Usage,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        model: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
         stop_reason: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_message: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        response_id: Option<String>,
         #[serde(default = "default_timestamp")]
         timestamp: i64,
     },
@@ -178,6 +198,37 @@ pub enum Message {
         #[serde(default = "default_timestamp")]
         timestamp: i64,
     },
+}
+
+// Allow constructing a Message from a simple string (TS: user content can be string)
+impl Message {
+    pub fn user_from_string<S: Into<String>>(text: S) -> Self {
+        Message::User {
+            content: vec![ContentBlock::Text { text: text.into() }],
+            timestamp: default_timestamp(),
+        }
+    }
+
+    pub fn assistant_default(api: Api, provider: ProviderId) -> Self {
+        Message::Assistant {
+            content: vec![],
+            api,
+            provider,
+            model: None,
+            usage: Usage::default(),
+            stop_reason: None,
+            error_message: None,
+            response_id: None,
+            timestamp: default_timestamp(),
+        }
+    }
+
+    pub fn with_error_message<S: Into<String>>(mut self, msg: S) -> Self {
+        if let Message::Assistant { ref mut error_message, .. } = self {
+            *error_message = Some(msg.into());
+        }
+        self
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -246,6 +297,17 @@ pub struct SimpleStreamOptions {
     pub tool_choice: Option<ToolChoice>,
     pub thinking: Option<ModelThinkingLevel>,
     pub provider_extra: Option<serde_json::Value>,
+    pub session_id: Option<String>,
+    pub cache_retention: Option<CacheRetention>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum CacheRetention {
+    #[default]
+    None,
+    Short,
+    Long,
 }
 
 pub type AssistantMessage = Message;
@@ -254,7 +316,6 @@ pub type AssistantMessage = Message;
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum AssistantMessageEvent {
     Start {
-        model: String,
         partial: AssistantMessage,
     },
     TextStart,
@@ -271,13 +332,15 @@ pub enum AssistantMessageEvent {
     },
     ToolcallStart {
         content_index: usize,
-        partial: AssistantMessage,
+        id: Option<String>,
+        name: Option<String>,
     },
     ToolcallDelta {
         content_index: usize,
-        partial: AssistantMessage,
+        delta: String,
     },
     ToolcallEnd {
+        content_index: usize,
         tool_call: ContentBlock,
     },
     Usage {
@@ -288,6 +351,7 @@ pub enum AssistantMessageEvent {
         message: AssistantMessage,
     },
     Error {
+        reason: String,
         error: String,
     },
 }
