@@ -1,4 +1,4 @@
-//! Integration tests for pi-ai-rs — mirrors the TypeScript @earendil-works/pi-ai test suite.
+//! Integration tests for otter-ai — mirrors the TypeScript @earendil-works/pi-ai test suite.
 //!
 //! Organized into modules matching the TS test file names:
 //! - `faux_provider`  (faux-provider.test.ts)        — 23 tests, all run
@@ -9,14 +9,14 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
-use pi_ai_rs::auth::{
+use otter_ai::auth::{
     ApiKeyCredential, AuthOperationOptions, Credential, CredentialStore, InMemoryCredentialStore,
     OAuthCredential, OAuthCredentials,
 };
-use pi_ai_rs::auth::types::ModifyFn;
-use pi_ai_rs::providers::faux::*;
-use pi_ai_rs::types::*;
-use pi_ai_rs::*;
+use otter_ai::auth::types::ModifyFn;
+use otter_ai::providers::faux::*;
+use otter_ai::types::*;
+use otter_ai::*;
 use serde_json::json;
 
 // ---------------------------------------------------------------------------
@@ -589,7 +589,7 @@ mod faux_provider {
         let usage = usage_of(&response);
 
         // Reconstruct the same prompt serialization the faux provider uses.
-        let prompt_text = pi_ai_rs::providers::faux::serialize_context(&context);
+        let prompt_text = otter_ai::providers::faux::serialize_context(&context);
         let expected_prompt_tokens = ((prompt_text.len() as f64) / 4.0).ceil() as u64;
         let expected_output_tokens = ((4.0_f64) / 4.0).ceil() as u64; // "done" = 4 chars
 
@@ -1156,8 +1156,8 @@ mod faux_provider {
 // ===========================================================================
 
 mod validation {
-    use pi_ai_rs::utils::validation::validate_tool_arguments;
-    use pi_ai_rs::types::Tool;
+    use otter_ai::utils::validation::validate_tool_arguments;
+    use otter_ai::types::Tool;
     use serde_json::json;
 
     fn make_tool(parameters: serde_json::Value) -> Tool {
@@ -1329,7 +1329,7 @@ mod validation {
 
 mod models_runtime {
     use super::*;
-    use pi_ai_rs::utils::validation::calculate_cost;
+    use otter_ai::utils::validation::calculate_cost;
 
     #[test]
     fn applies_request_wide_pricing_tiers_above_the_configured_input_threshold() {

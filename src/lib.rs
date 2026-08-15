@@ -1,4 +1,4 @@
-//! # pi-ai-rs
+//! # otter-ai
 //!
 //! Unified LLM API with provider collections, automatic auth resolution,
 //! token and cost tracking, and simple context persistence and hand-off
@@ -9,10 +9,10 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use pi_ai_rs::*;
-//! use pi_ai_rs::types::*;
-//! use pi_ai_rs::models::create_models;
-//! use pi_ai_rs::providers::faux::register_faux_provider;
+//! use otter_ai::*;
+//! use otter_ai::types::*;
+//! use otter_ai::models::create_models;
+//! use otter_ai::providers::faux::register_faux_provider;
 //!
 //! # async fn example() -> anyhow::Result<()> {
 //! // 1. Create the models registry

@@ -1,5 +1,5 @@
 [package]
-name = "pi-ai-rs"
+name = "otter-ai"
 version = "0.1.0"
 edition = "2021"
 description = "Unified LLM API with provider collections, automatic auth resolution, token and cost tracking"
