@@ -229,6 +229,13 @@ impl Message {
         }
         self
     }
+
+    pub fn stop_reason(&self) -> Option<&str> {
+        match self {
+            Message::Assistant { stop_reason, .. } => stop_reason.as_deref(),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

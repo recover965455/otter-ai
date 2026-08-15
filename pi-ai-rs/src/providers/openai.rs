@@ -1,18 +1,16 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::{Provider, RefreshModelsContext};
 use crate::auth::types::{
-    ApiKeyAuth, ApiKeyCredential, AuthCheck, AuthContext, AuthInteraction, AuthPrompt, AuthResult, ProviderAuth,
+    ApiKeyAuth, AuthContext, AuthInteraction, AuthResult, ModelAuth, ProviderAuth,
 };
 use crate::types::{
     ApiStreamOptions, AssistantMessageEvent, Context, CancellationToken,
-    ContentBlock, Message, Model, ModelCostRates, ModelThinkingLevel, Usage,
+    Message, Model, ModelCostRates, ModelThinkingLevel,
 };
 use crate::utils::event_stream::AssistantMessageEventStream;
-use crate::utils::validation::calculate_usage_cost;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenAIProviderConfig {
@@ -131,6 +129,7 @@ pub fn openai_provider() -> OpenAIProvider {
             supports_structured_output: true,
             supports_system_prompt: true,
             thinking: ModelThinkingLevel::None,
+            reasoning: false,
             cost_rates: ModelCostRates {
                 input_per_million: Some(0.15),
                 output_per_million: Some(0.60),
@@ -154,6 +153,7 @@ pub fn openai_provider() -> OpenAIProvider {
             supports_structured_output: true,
             supports_system_prompt: true,
             thinking: ModelThinkingLevel::None,
+            reasoning: false,
             cost_rates: ModelCostRates {
                 input_per_million: Some(2.50),
                 output_per_million: Some(10.0),
@@ -205,301 +205,14 @@ impl Provider for OpenAIProvider {
         _context: Context,
         _options: ApiStreamOptions,
     ) -> AssistantMessageEventStream {
-        // NOTE: Live OpenAI adapter not implemented in this faux-test-alignment pass.
-        // Produces a single Error event.
-        use futures::StreamExt;
-        let stream = async_stream::stream! {
-            yield AssistantMessageEvent::Error { error: "OpenAI live adapter not available in this build".into() };
-        };
-        AssistantMessageEventStream::new(stream.boxed())
-    }
-}
-
-fn build_openai_request(
-    model: &Model,
-    ctx: &Context,
-    stream: bool,
-) -> (serde_json::Value, HashMap<String, usize>) {
-    let mut body = serde_json::json!({
-        "model": model.id,
-        "stream": stream,
-    });
-    if let Some(temp) = ctx.temperature.or(model.default_temperature) {
-        body["temperature"] = serde_json::json!(temp);
-    }
-    if let Some(max) = ctx.max_tokens {
-        body["max_tokens"] = serde_json::json!(max);
-    }
-    if let Some(fmt) = &ctx.response_format {
-        body["response_format"] = serde_json::to_value(fmt).unwrap_or(serde_json::Value::Null);
-    }
-
-    let mut messages: Vec<serde_json::Value> = vec![];
-    if let Some(sys) = &ctx.system_prompt {
-        messages.push(serde_json::json!({
-            "role": "system",
-            "content": sys,
-        }));
-    }
-
-    for msg in ctx.messages.iter() {
-        match msg {
-            Message::User { content, .. } => {
-                let parts: Vec<serde_json::Value> = content
-                    .iter()
-                    .filter_map(|block| match block {
-                        ContentBlock::Text { text } => {
-                            Some(serde_json::json!({ "type": "text", "text": text }))
-                        }
-                        ContentBlock::Image(img) => {
-                            let mime = img.mime_type.clone().unwrap_or_else(|| {
-                                if img.data.starts_with("data:image/png") {
-                                    "image/png".to_string()
-                                } else if img.data.starts_with("data:image/jpeg") {
-                                    "image/jpeg".to_string()
-                                } else {
-                                    "image/png".to_string()
-                                }
-                            });
-                            let url = if img.data.starts_with("data:") {
-                                img.data.clone()
-                            } else {
-                                format!("data:{};base64,{}", mime, img.data)
-                            };
-                            Some(serde_json::json!({
-                                "type": "image_url",
-                                "image_url": { "url": url }
-                            }))
-                        }
-                        _ => None,
-                    })
-                    .collect();
-                let content_val = if parts.len() == 1 {
-                    if let Some(text) = parts[0].get("text").and_then(|t| t.as_str()) {
-                        serde_json::Value::String(text.to_string())
-                    } else {
-                        serde_json::Value::Array(parts)
-                    }
-                } else {
-                    serde_json::Value::Array(parts)
-                };
-                messages.push(serde_json::json!({ "role": "user", "content": content_val }));
-            }
-            Message::Assistant { content, .. } => {
-                let mut oai_content: Vec<serde_json::Value> = vec![];
-                let mut tool_calls: Vec<serde_json::Value> = vec![];
-                for block in content {
-                    match block {
-                        ContentBlock::Text { text } => oai_content.push(serde_json::json!({
-                            "type": "text",
-                            "text": text,
-                        })),
-                        ContentBlock::ToolCall { id, name, arguments } => {
-                            tool_calls.push(serde_json::json!({
-                                "id": id,
-                                "type": "function",
-                                "function": {
-                                    "name": name,
-                                    "arguments": serde_json::to_string(arguments).unwrap_or_default(),
-                                }
-                            }));
-                        }
-                        _ => {}
-                    }
-                }
-                let mut msg_obj = serde_json::json!({ "role": "assistant" });
-                if !oai_content.is_empty() {
-                    let cval = if oai_content.len() == 1 {
-                        oai_content[0].get("text").cloned().unwrap_or_else(|| {
-                            serde_json::Value::Array(oai_content.clone())
-                        })
-                    } else {
-                        serde_json::Value::Array(oai_content)
-                    };
-                    msg_obj["content"] = cval;
-                } else {
-                    msg_obj["content"] = serde_json::Value::Null;
-                }
-                if !tool_calls.is_empty() {
-                    msg_obj["tool_calls"] = serde_json::Value::Array(tool_calls);
-                }
-                messages.push(msg_obj);
-            }
-            Message::ToolResult { tool_call_id, content, .. } => {
-                let text = crate::types::content_text(content);
-                messages.push(serde_json::json!({
-                    "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "content": text,
-                }));
-            }
-            Message::System { content, .. } => {
-                let text = crate::types::content_text(content);
-                messages.push(serde_json::json!({
-                    "role": "system",
-                    "content": text,
-                }));
-            }
-        }
-    }
-    body["messages"] = serde_json::Value::Array(messages);
-
-    if !ctx.tools.is_empty() {
-        let oai_tools: Vec<serde_json::Value> = ctx
-            .tools
-            .iter()
-            .map(|t| {
-                serde_json::json!({
-                    "type": "function",
-                    "function": {
-                        "name": t.name,
-                        "description": t.description.clone().unwrap_or_default(),
-                        "parameters": t.parameters.clone(),
-                    }
-                })
-            })
-            .collect();
-        body["tools"] = serde_json::Value::Array(oai_tools);
-    }
-    (body, HashMap::new())
-}
-
-fn from_openai_response_json(
-    model: &Model,
-    json: &serde_json::Value,
-) -> Vec<AssistantMessageEvent> {
-    let mut events: Vec<AssistantMessageEvent> = vec![];
-
-    let partial_msg = Message::Assistant {
-        content: vec![],
-        usage: Usage::default(),
-        model: Some(model.id.clone()),
-        stop_reason: None,
-        timestamp: chrono::Utc::now().timestamp_millis(),
-    };
-    events.push(AssistantMessageEvent::Start {
-        model: model.id.clone(),
-        partial: partial_msg,
-    });
-
-    let mut content_blocks: Vec<ContentBlock> = vec![];
-    let mut usage: Usage = Usage::default();
-    let mut stop_reason: Option<String> = None;
-
-    if let Some(choice) = json
-        .get("choices")
-        .and_then(|c| c.as_array())
-        .and_then(|arr| arr.first())
-    {
-        stop_reason = choice
-            .get("finish_reason")
-            .and_then(|s| s.as_str())
-            .map(|s| s.to_string());
-        if let Some(msg) = choice.get("message") {
-            if let Some(text) = msg.get("content").and_then(|c| c.as_str()) {
-                if !text.is_empty() {
-                    events.push(AssistantMessageEvent::TextStart);
-                    events.push(AssistantMessageEvent::TextDelta {
-                        delta: text.to_string(),
-                    });
-                    events.push(AssistantMessageEvent::TextEnd);
-                    content_blocks.push(ContentBlock::Text {
-                        text: text.to_string(),
-                    });
-                }
-            }
-            if let Some(tcs) = msg.get("tool_calls").and_then(|t| t.as_array()) {
-                for (idx, tc) in tcs.iter().enumerate() {
-                    let id = tc
-                        .get("id")
-                        .and_then(|s| s.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let func = tc.get("function").unwrap_or(&serde_json::Value::Null);
-                    let name = func
-                        .get("name")
-                        .and_then(|s| s.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let args_str = func
-                        .get("arguments")
-                        .and_then(|s| s.as_str())
-                        .unwrap_or("{}");
-                    let arguments: serde_json::Value =
-                        serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
-
-                    let partial = Message::Assistant {
-                        content: vec![ContentBlock::ToolCall {
-                            id: String::new(),
-                            name: String::new(),
-                            arguments: serde_json::Value::Null,
-                        }],
-                        usage: Usage::default(),
-                        model: Some(model.id.clone()),
-                        stop_reason: None,
-                        timestamp: chrono::Utc::now().timestamp_millis(),
-                    };
-                    events.push(AssistantMessageEvent::ToolcallStart {
-                        content_index: idx,
-                        partial,
-                    });
-                    let partial2 = Message::Assistant {
-                        content: vec![ContentBlock::ToolCall {
-                            id: id.clone(),
-                            name: name.clone(),
-                            arguments: arguments.clone(),
-                        }],
-                        usage: Usage::default(),
-                        model: Some(model.id.clone()),
-                        stop_reason: None,
-                        timestamp: chrono::Utc::now().timestamp_millis(),
-                    };
-                    events.push(AssistantMessageEvent::ToolcallDelta {
-                        content_index: idx,
-                        partial: partial2,
-                    });
-                    let tc_block = ContentBlock::ToolCall {
-                        id: id.clone(),
-                        name: name.clone(),
-                        arguments: arguments.clone(),
-                    };
-                    events.push(AssistantMessageEvent::ToolcallEnd {
-                        tool_call: tc_block.clone(),
-                    });
-                    content_blocks.push(tc_block);
-                }
-            }
-        }
-    }
-
-    if let Some(u) = json.get("usage") {
-        let prompt = u.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-        let comp = u.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-        let cache_read = u
-            .get("prompt_tokens_details")
-            .and_then(|d| d.get("cached_tokens"))
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0);
-        usage.input = prompt;
-        usage.output = comp;
-        usage.cache_read_input = cache_read;
-        usage.cost = calculate_usage_cost(prompt, comp, cache_read, 0, model);
-        events.push(AssistantMessageEvent::Usage {
-            usage: usage.clone(),
+        let es = crate::utils::event_stream::create_assistant_message_event_stream();
+        let msg = Message::assistant_default("openai".into(), "openai".into())
+            .with_error_message("OpenAI live adapter not available in this build");
+        es.push(AssistantMessageEvent::Error {
+            reason: "error".into(),
+            error: "OpenAI live adapter not available in this build".into(),
         });
+        es.end(Some(msg));
+        es
     }
-
-    let msg = Message::Assistant {
-        content: content_blocks,
-        usage: usage.clone(),
-        model: Some(model.id.clone()),
-        stop_reason: stop_reason.clone(),
-        timestamp: chrono::Utc::now().timestamp_millis(),
-    };
-    events.push(AssistantMessageEvent::Done {
-        reason: stop_reason.unwrap_or_else(|| "unknown".to_string()),
-        message: msg,
-    });
-
-    events
 }

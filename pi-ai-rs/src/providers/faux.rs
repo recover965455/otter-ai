@@ -15,14 +15,14 @@ use std::sync::{Arc, Mutex};
 use futures::StreamExt;
 use rand::Rng;
 
-use crate::auth::types::{ApiKeyAuth, ApiKeyCredential, AuthCheck, AuthContext, AuthInteraction, AuthPrompt, AuthResult, CancellationToken, ProviderAuth};
+use crate::auth::types::{ApiKeyAuth, ApiKeyCredential, AuthCheck, AuthContext, AuthInteraction, AuthPrompt, AuthResult, ProviderAuth};
 use crate::providers::{Provider, RefreshModelsContext};
 use crate::types::{
-    ApiStreamOptions, AssistantMessage, AssistantMessageEvent, CacheRetention,
+    ApiStreamOptions, AssistantMessage, AssistantMessageEvent, CacheRetention, CancellationToken,
     Context, ContentBlock, Message, Model, ModelThinkingLevel, SimpleStreamOptions,
     Usage, UsageCost,
 };
-use crate::utils::event_stream::AssistantMessageEventStream;
+use crate::utils::event_stream::{create_assistant_message_event_stream, AssistantMessageEventStream};
 
 // ---------- constants ----------
 const DEFAULT_API: &str = "faux";
@@ -266,7 +266,7 @@ fn message_to_text(msg: &Message) -> String {
     }
 }
 
-fn serialize_context(ctx: &Context) -> String {
+pub fn serialize_context(ctx: &Context) -> String {
     let mut parts: Vec<String> = vec![];
     if let Some(sys) = &ctx.system_prompt {
         parts.push(format!("system:{}", sys));
@@ -412,6 +412,14 @@ fn create_aborted_message(mut partial: AssistantMessage) -> AssistantMessage {
     partial
 }
 
+fn error_str(msg: &Message) -> String {
+    match msg {
+        Message::Assistant { error_message: Some(e), .. } => e.clone(),
+        Message::Assistant { stop_reason: Some(r), .. } => r.clone(),
+        _ => "unknown error".to_string(),
+    }
+}
+
 async fn schedule_chunk(chars: &str, tokens_per_second: Option<u64>) {
     let Some(tps) = tokens_per_second else {
         // microtask-ish: yield once
@@ -464,7 +472,7 @@ async fn stream_with_deltas(
         let aborted = create_aborted_message(partial);
         stream.push(AssistantMessageEvent::Error {
             reason: "aborted".into(),
-            error: aborted.clone(),
+            error: error_str(&aborted),
         });
         stream.end(Some(aborted));
         return;
@@ -484,7 +492,7 @@ async fn stream_with_deltas(
         let a = create_aborted_message(partial.clone());
         stream.push(AssistantMessageEvent::Error {
             reason: "aborted".into(),
-            error: a.clone(),
+            error: error_str(&a),
         });
         stream.end(Some(a));
         true
@@ -596,7 +604,7 @@ async fn stream_with_deltas(
             );
             stream.push(AssistantMessageEvent::Error {
                 reason: "error".into(),
-                error: err.clone(),
+                error: error_str(&err),
             });
             stream.end(Some(err));
             return;
@@ -605,7 +613,7 @@ async fn stream_with_deltas(
             let reason = terminal_stop_reason(&message).unwrap().to_string();
             stream.push(AssistantMessageEvent::Error {
                 reason: reason.clone(),
-                error: message.clone(),
+                error: error_str(&message),
             });
             stream.end(Some(message));
             return;
@@ -756,7 +764,7 @@ impl FauxCore {
         context: Context,
         options: Option<SimpleStreamOptions>,
     ) -> AssistantMessageEventStream {
-        let stream = AssistantMessageEventStream::new();
+        let stream = create_assistant_message_event_stream();
         let step = {
             let mut inner = self.inner.lock().unwrap();
             inner.state.call_count += 1;
@@ -796,7 +804,7 @@ impl FauxCore {
                     drop(inner);
                     stream_clone.push(AssistantMessageEvent::Error {
                         reason: "error".into(),
-                        error: msg.clone(),
+                        error: error_str(&msg),
                     });
                     stream_clone.end(Some(msg));
                 }
@@ -1008,37 +1016,25 @@ pub async fn complete(
         .get_model(None)
         .ok_or_else(|| "faux registration has no default model".to_string())?;
     let stream = registration.core.stream(&model, context, options);
-    let mut result_msg: Option<AssistantMessage> = None;
+    let result_fut = stream.result_future();
+    let mut st = stream;
     let mut last_error: Option<String> = None;
-    let mut st = stream.into_stream();
     while let Some(evt) = st.next().await {
         match evt {
-            AssistantMessageEvent::Done { message, .. } => {
-                result_msg = Some(message);
-            }
-            AssistantMessageEvent::Error { error, reason } => {
-                last_error = Some(
-                    match &error {
-                        Message::Assistant { error_message: Some(m), .. } => m.clone(),
-                        _ => reason,
-                    }
-                );
-                result_msg = Some(error);
+            AssistantMessageEvent::Error { error, .. } => {
+                last_error = Some(error);
             }
             _ => {}
         }
     }
-    match result_msg {
-        Some(m) => {
-            // In TS, "No more faux responses queued" is still an assistant message
-            // with stopReason==="error", which the test then compares. We return
-            // Ok here so callers can inspect stop_reason/error_message directly.
-            if matches!(m, Message::Assistant { stop_reason: Some(ref s), error_message: Some(_), .. } if s == "error" && last_error.is_some()) {
-                // pass through as Ok(assistant error message) per TS semantics
-            }
-            Ok(m)
-        }
-        None => Err(last_error.unwrap_or_else(|| "stream ended without result".into())),
+    let msg = result_fut.await;
+    if msg.stop_reason().map(|s| s == "error").unwrap_or(false) {
+        // pass through as Ok(assistant error message) per TS semantics
+        Ok(msg)
+    } else if let Some(e) = last_error {
+        Err(e)
+    } else {
+        Ok(msg)
     }
 }
 

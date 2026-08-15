@@ -4,14 +4,13 @@ use std::sync::Arc;
 
 use super::{Provider, RefreshModelsContext};
 use crate::auth::types::{
-    ApiKeyAuth, ApiKeyCredential, AuthCheck, AuthContext, AuthInteraction, AuthPrompt, AuthResult, ProviderAuth,
+    ApiKeyAuth, AuthContext, AuthInteraction, AuthResult, ModelAuth, ProviderAuth,
 };
 use crate::types::{
     ApiStreamOptions, AssistantMessageEvent, Context, CancellationToken,
-    ContentBlock, Message, Model, ModelCostRates, ModelThinkingLevel, Usage,
+    Message, Model, ModelCostRates, ModelThinkingLevel,
 };
 use crate::utils::event_stream::AssistantMessageEventStream;
-use crate::utils::validation::calculate_usage_cost;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnthropicProviderConfig {
@@ -134,11 +133,13 @@ pub fn anthropic_provider() -> AnthropicProvider {
             supports_structured_output: true,
             supports_system_prompt: true,
             thinking: ModelThinkingLevel::None,
+            reasoning: false,
             cost_rates: ModelCostRates {
                 input_per_million: Some(3.0),
                 output_per_million: Some(15.0),
                 input_cache_read_per_million: Some(0.30),
                 input_cache_write_per_million: Some(3.75),
+                tiers: vec![],
             },
             context_window: Some(200000),
             default_temperature: Some(1.0),
@@ -158,11 +159,13 @@ pub fn anthropic_provider() -> AnthropicProvider {
             supports_structured_output: true,
             supports_system_prompt: true,
             thinking: ModelThinkingLevel::None,
+            reasoning: false,
             cost_rates: ModelCostRates {
                 input_per_million: Some(15.0),
                 output_per_million: Some(75.0),
                 input_cache_read_per_million: Some(1.50),
                 input_cache_write_per_million: Some(18.75),
+                tiers: vec![],
             },
             context_window: Some(200000),
             default_temperature: Some(1.0),
@@ -182,11 +185,13 @@ pub fn anthropic_provider() -> AnthropicProvider {
             supports_structured_output: true,
             supports_system_prompt: true,
             thinking: ModelThinkingLevel::High,
+            reasoning: false,
             cost_rates: ModelCostRates {
                 input_per_million: Some(3.0),
                 output_per_million: Some(15.0),
                 input_cache_read_per_million: Some(0.30),
                 input_cache_write_per_million: Some(3.75),
+                tiers: vec![],
             },
             context_window: Some(200000),
             default_temperature: Some(1.0),
@@ -234,296 +239,14 @@ impl Provider for AnthropicProvider {
         _context: Context,
         _options: ApiStreamOptions,
     ) -> AssistantMessageEventStream {
-        // NOTE: Live Anthropic adapter not implemented in this faux-test-alignment pass.
-        use futures::StreamExt;
-        let stream = async_stream::stream! {
-            yield AssistantMessageEvent::Error { error: "Anthropic live adapter not available in this build".into() };
-        };
-        AssistantMessageEventStream::new(stream.boxed())
-    }
-}
-
-fn build_anthropic_request(
-    model: &Model,
-    ctx: &Context,
-    _stream: bool,
-) -> serde_json::Value {
-    let mut body = serde_json::json!({
-        "model": model.id,
-        "max_tokens": ctx.max_tokens.unwrap_or(model.max_output_tokens.unwrap_or(4096)),
-    });
-    if let Some(temp) = ctx.temperature.or(model.default_temperature) {
-        body["temperature"] = serde_json::json!(temp);
-    }
-    if let Some(sys) = &ctx.system_prompt {
-        body["system"] = serde_json::json!(sys);
-    }
-
-    let mut messages: Vec<serde_json::Value> = vec![];
-    let mut last_role: Option<String> = None;
-
-    for msg in &ctx.messages {
-        match msg {
-            Message::User { content, .. } => {
-                let content_arr: Vec<serde_json::Value> = content
-                    .iter()
-                    .filter_map(|block| match block {
-                        ContentBlock::Text { text } => {
-                            Some(serde_json::json!({ "type": "text", "text": text }))
-                        }
-                        ContentBlock::Image(img) => {
-                            let mime = img.mime_type.clone().unwrap_or_else(|| {
-                                if img.data.starts_with("data:image/png") {
-                                    "image/png".to_string()
-                                } else if img.data.starts_with("data:image/jpeg") {
-                                    "image/jpeg".to_string()
-                                } else {
-                                    "image/png".to_string()
-                                }
-                            });
-                            let data = if img.data.starts_with("data:") {
-                                img.data.split(',').nth(1).unwrap_or(&img.data).to_string()
-                            } else {
-                                img.data.clone()
-                            };
-                            Some(serde_json::json!({
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": mime,
-                                    "data": data,
-                                }
-                            }))
-                        }
-                        _ => None,
-                    })
-                    .collect();
-
-                if last_role.as_deref() == Some("user") {
-                    messages.push(serde_json::json!({
-                        "role": "assistant",
-                        "content": [{ "type": "text", "text": " " }]
-                    }));
-                }
-                messages.push(serde_json::json!({
-                    "role": "user",
-                    "content": content_arr,
-                }));
-                last_role = Some("user".to_string());
-            }
-            Message::Assistant { content, .. } => {
-                let content_arr: Vec<serde_json::Value> = content
-                    .iter()
-                    .filter_map(|block| match block {
-                        ContentBlock::Text { text } => {
-                            Some(serde_json::json!({ "type": "text", "text": text }))
-                        }
-                        ContentBlock::ToolCall { id, name, arguments } => {
-                            Some(serde_json::json!({
-                                "type": "tool_use",
-                                "id": id,
-                                "name": name,
-                                "input": arguments.clone(),
-                            }))
-                        }
-                        ContentBlock::Thinking { thinking, .. } => {
-                            Some(serde_json::json!({ "type": "text", "text": thinking }))
-                        }
-                        _ => None,
-                    })
-                    .collect();
-                if !content_arr.is_empty() {
-                    messages.push(serde_json::json!({
-                        "role": "assistant",
-                        "content": content_arr,
-                    }));
-                    last_role = Some("assistant".to_string());
-                }
-            }
-            Message::ToolResult { tool_call_id, content, is_error, .. } => {
-                let text = crate::types::content_text(content);
-                if last_role.as_deref() == Some("user") {
-                    messages.push(serde_json::json!({
-                        "role": "assistant",
-                        "content": [{ "type": "text", "text": " " }]
-                    }));
-                }
-                messages.push(serde_json::json!({
-                    "role": "user",
-                    "content": [{
-                        "type": "tool_result",
-                        "tool_use_id": tool_call_id,
-                        "content": text,
-                        "is_error": is_error,
-                    }]
-                }));
-                last_role = Some("user".to_string());
-            }
-            Message::System { content, .. } => {
-                let text = crate::types::content_text(content);
-                if let Some(existing) = body.get("system").and_then(|s| s.as_str()) {
-                    body["system"] = serde_json::json!(format!("{}\n\n{}", existing, text));
-                } else {
-                    body["system"] = serde_json::json!(text);
-                }
-            }
-        }
-    }
-
-    body["messages"] = serde_json::Value::Array(messages);
-
-    if !ctx.tools.is_empty() {
-        let anthropic_tools: Vec<serde_json::Value> = ctx
-            .tools
-            .iter()
-            .map(|t| {
-                serde_json::json!({
-                    "name": t.name,
-                    "description": t.description.clone().unwrap_or_default(),
-                    "input_schema": t.parameters.clone(),
-                })
-            })
-            .collect();
-        body["tools"] = serde_json::Value::Array(anthropic_tools);
-
-        if let Some(tc) = &ctx.tool_choice {
-            let serialized = match tc {
-                crate::types::ToolChoice::Auto => serde_json::json!({ "type": "auto" }),
-                crate::types::ToolChoice::None => serde_json::json!({ "type": "auto" }),
-                crate::types::ToolChoice::Required => serde_json::json!({ "type": "any" }),
-                crate::types::ToolChoice::Tool { name } => {
-                    serde_json::json!({ "type": "tool", "name": name })
-                }
-            };
-            body["tool_choice"] = serialized;
-        }
-    }
-    body
-}
-
-fn from_anthropic_response_json(
-    model: &Model,
-    json: &serde_json::Value,
-) -> Vec<AssistantMessageEvent> {
-    let mut events: Vec<AssistantMessageEvent> = vec![];
-
-    let partial_msg = Message::Assistant {
-        content: vec![],
-        usage: Usage::default(),
-        model: Some(model.id.clone()),
-        stop_reason: None,
-        timestamp: chrono::Utc::now().timestamp_millis(),
-    };
-    events.push(AssistantMessageEvent::Start {
-        model: model.id.clone(),
-        partial: partial_msg,
-    });
-
-    let mut content_blocks: Vec<ContentBlock> = vec![];
-    let mut usage: Usage = Usage::default();
-    let stop_reason = json
-        .get("stop_reason")
-        .and_then(|s| s.as_str())
-        .map(|s| s.to_string());
-
-    if let Some(arr) = json.get("content").and_then(|c| c.as_array()) {
-        let mut tool_idx = 0usize;
-        for block in arr {
-            match block.get("type").and_then(|t| t.as_str()) {
-                Some("text") => {
-                    let text = block.get("text").and_then(|s| s.as_str()).unwrap_or("").to_string();
-                    if !text.is_empty() {
-                        events.push(AssistantMessageEvent::TextStart);
-                        events.push(AssistantMessageEvent::TextDelta { delta: text.clone() });
-                        events.push(AssistantMessageEvent::TextEnd);
-                        content_blocks.push(ContentBlock::Text { text });
-                    }
-                }
-                Some("tool_use") => {
-                    let id = block.get("id").and_then(|s| s.as_str()).unwrap_or("").to_string();
-                    let name = block.get("name").and_then(|s| s.as_str()).unwrap_or("").to_string();
-                    let input = block.get("input").cloned().unwrap_or(serde_json::Value::Null);
-
-                    let idx = tool_idx;
-                    tool_idx += 1;
-
-                    let partial = Message::Assistant {
-                        content: vec![ContentBlock::ToolCall {
-                            id: String::new(),
-                            name: String::new(),
-                            arguments: serde_json::Value::Null,
-                        }],
-                        usage: Usage::default(),
-                        model: Some(model.id.clone()),
-                        stop_reason: None,
-                        timestamp: chrono::Utc::now().timestamp_millis(),
-                    };
-                    events.push(AssistantMessageEvent::ToolcallStart {
-                        content_index: idx,
-                        partial,
-                    });
-                    let partial2 = Message::Assistant {
-                        content: vec![ContentBlock::ToolCall {
-                            id: id.clone(),
-                            name: name.clone(),
-                            arguments: input.clone(),
-                        }],
-                        usage: Usage::default(),
-                        model: Some(model.id.clone()),
-                        stop_reason: None,
-                        timestamp: chrono::Utc::now().timestamp_millis(),
-                    };
-                    events.push(AssistantMessageEvent::ToolcallDelta {
-                        content_index: idx,
-                        partial: partial2,
-                    });
-                    let tc_block = ContentBlock::ToolCall {
-                        id: id.clone(),
-                        name: name.clone(),
-                        arguments: input.clone(),
-                    };
-                    events.push(AssistantMessageEvent::ToolcallEnd {
-                        tool_call: tc_block.clone(),
-                    });
-                    content_blocks.push(tc_block);
-                }
-                _ => {}
-            }
-        }
-    }
-
-    if let Some(u) = json.get("usage") {
-        let input = u.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-        let output = u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-        let cache_write = u
-            .get("cache_creation_input_tokens")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0);
-        let cache_read = u
-            .get("cache_read_input_tokens")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0);
-        usage.input = input;
-        usage.output = output;
-        usage.cache_read_input = cache_read;
-        usage.cache_write_input = cache_write;
-        usage.cost = calculate_usage_cost(input, output, cache_read, cache_write, model);
-        events.push(AssistantMessageEvent::Usage {
-            usage: usage.clone(),
+        let es = crate::utils::event_stream::create_assistant_message_event_stream();
+        let msg = Message::assistant_default("anthropic".into(), "anthropic".into())
+            .with_error_message("Anthropic live adapter not available in this build");
+        es.push(AssistantMessageEvent::Error {
+            reason: "error".into(),
+            error: "Anthropic live adapter not available in this build".into(),
         });
+        es.end(Some(msg));
+        es
     }
-
-    let msg = Message::Assistant {
-        content: content_blocks,
-        usage: usage.clone(),
-        model: Some(model.id.clone()),
-        stop_reason: stop_reason.clone(),
-        timestamp: chrono::Utc::now().timestamp_millis(),
-    };
-    events.push(AssistantMessageEvent::Done {
-        reason: stop_reason.unwrap_or_else(|| "unknown".to_string()),
-        message: msg,
-    });
-
-    events
 }

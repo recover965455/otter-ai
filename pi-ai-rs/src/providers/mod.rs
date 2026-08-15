@@ -80,7 +80,7 @@ pub trait Provider: Send + Sync {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RefreshCtxState {
     pub credential: Option<Credential>,
     pub stored: Option<ModelsStoreEntry>,
