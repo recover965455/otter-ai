@@ -2,13 +2,18 @@
 //!
 //! Organized into modules matching the TS test file names:
 //! - `faux_provider`  (faux-provider.test.ts)        — 23 tests, all run
-//! - `validation`     (validation.test.ts)            — 9 tests, all #[ignore]
-//! - `models_runtime` (models-runtime.test.ts)        — core tests run, OAuth tests #[ignore]
-//! - `abort`          (abort.test.ts)                 — 41 tests, all #[ignore]
+//! - `validation`     (validation.test.ts)            — 9 tests, all run
+//! - `models_runtime` (models-runtime.test.ts)        — core tests run, OAuth/auth-resolution tests #[ignore]
+//! - `abort`          (abort.test.ts)                 — 41 tests, all #[ignore] (require real API credentials)
 
 use std::sync::Arc;
 
 use futures::StreamExt;
+use pi_ai_rs::auth::{
+    ApiKeyCredential, AuthOperationOptions, Credential, CredentialStore, InMemoryCredentialStore,
+    OAuthCredential, OAuthCredentials,
+};
+use pi_ai_rs::auth::types::ModifyFn;
 use pi_ai_rs::providers::faux::*;
 use pi_ai_rs::types::*;
 use pi_ai_rs::*;
@@ -1151,74 +1156,170 @@ mod faux_provider {
 // ===========================================================================
 
 mod validation {
-    // The Rust `validate_tool_arguments` is currently a stub that only checks
-    // whether `arguments` is a JSON object. The TS version performs AJV-style
-    // type coercion (number, boolean, string, null), nullable-union resolution,
-    // optional-property omission, and schema-based validation. All 9 tests below
-    // require those enhanced capabilities and are therefore #[ignore]d.
+    use pi_ai_rs::utils::validation::validate_tool_arguments;
+    use pi_ai_rs::types::Tool;
+    use serde_json::json;
+
+    fn make_tool(parameters: serde_json::Value) -> Tool {
+        Tool {
+            name: "echo".into(),
+            description: Some("Echo tool".into()),
+            parameters,
+        }
+    }
+
+    fn make_tool_with_value_schema(schema: serde_json::Value, value: serde_json::Value) -> (Tool, serde_json::Value) {
+        let tool = make_tool(json!({
+            "type": "object",
+            "properties": { "value": schema },
+            "required": ["value"],
+        }));
+        let args = json!({ "value": value });
+        (tool, args)
+    }
 
     #[test]
-    #[ignore = "validate_tool_arguments needs enhancement: TS version coerces string \"42\" to number 42 even when Function constructor is unavailable; Rust version only checks is_object()"]
     fn still_validates_when_function_constructor_is_unavailable() {
-        // TS: globalThis.Function is disabled, yet validateToolArguments still
-        // coerces { count: "42" } → { count: 42 } via interpreted fallback.
-        // Rust: no equivalent coercion exists.
+        // Rust has no Function constructor concept; this test just verifies
+        // that coercion works without any code generation.
+        let tool = make_tool(json!({
+            "type": "object",
+            "properties": { "count": { "type": "number" } },
+            "required": ["count"],
+        }));
+        let args = json!({ "count": "42" });
+        let result = validate_tool_arguments(&tool, &args).unwrap();
+        assert_eq!(result, json!({ "count": 42 }));
     }
 
     #[test]
-    #[ignore = "validate_tool_arguments needs enhancement: AJV-compatible primitive coercion (number, boolean, string, null, type arrays) is not implemented"]
     fn coerces_serialized_plain_json_schemas_with_ajv_compatible_primitive_rules() {
-        // TS: coerces "42"→42, true→1, null→0, "true"→true, etc. based on schema type.
-        // Rust: no coercion logic.
+        let cases: Vec<(serde_json::Value, serde_json::Value, serde_json::Value)> = vec![
+            (json!({"type":"number"}), json!("42"), json!(42)),
+            (json!({"type":"number"}), json!(true), json!(1)),
+            (json!({"type":"number"}), json!(null), json!(0)),
+            (json!({"type":"integer"}), json!("42"), json!(42)),
+            (json!({"type":"boolean"}), json!("true"), json!(true)),
+            (json!({"type":"boolean"}), json!("false"), json!(false)),
+            (json!({"type":"boolean"}), json!(1), json!(true)),
+            (json!({"type":"boolean"}), json!(0), json!(false)),
+            (json!({"type":"string"}), json!(null), json!("")),
+            (json!({"type":"string"}), json!(true), json!("true")),
+            (json!({"type":"null"}), json!(""), json!(null)),
+            (json!({"type":"null"}), json!(0), json!(null)),
+            (json!({"type":"null"}), json!(false), json!(null)),
+            (json!({"type":["number","string"]}), json!("1"), json!("1")),
+            (json!({"type":["boolean","number"]}), json!("1"), json!(1)),
+        ];
+
+        for (schema, input, expected) in cases {
+            let (tool, args) = make_tool_with_value_schema(schema.clone(), input.clone());
+            let result = validate_tool_arguments(&tool, &args).unwrap();
+            assert_eq!(result, json!({ "value": expected }), "schema: {:?}, input: {:?}", schema, input);
+        }
     }
 
     #[test]
-    #[ignore = "validate_tool_arguments needs enhancement: treating null as omission for optional non-nullable properties is not implemented"]
     fn treats_null_as_omission_for_optional_non_nullable_properties() {
-        // TS: null values for optional non-nullable properties are stripped.
-        // Rust: no schema-aware omission.
+        let tool = make_tool(json!({
+            "type": "object",
+            "properties": {
+                "path": { "type": "string" },
+                "offset": { "type": "number" },
+                "nullable": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                "metadata": { "type": "object", "properties": { "enabled": { "type": "boolean" } } }
+            },
+            "required": ["path"],
+        }));
+        let args = json!({
+            "path": "file.txt",
+            "offset": null,
+            "nullable": null,
+            "metadata": { "enabled": null }
+        });
+        let result = validate_tool_arguments(&tool, &args).unwrap();
+        assert_eq!(result, json!({
+            "path": "file.txt",
+            "nullable": null,
+            "metadata": {}
+        }));
     }
 
     #[test]
-    #[ignore = "validate_tool_arguments needs enhancement: preserving optional nulls whose referenced schema is nullable ($defs/anyOf) is not implemented"]
     fn preserves_optional_nulls_whose_referenced_schema_is_nullable() {
-        // TS: $ref to anyOf [number, null] preserves null.
-        // Rust: no $ref or anyOf resolution.
+        let tool = make_tool(json!({
+            "type": "object",
+            "properties": {
+                "value": { "$ref": "#/$defs/value" }
+            },
+            "$defs": {
+                "value": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+            }
+        }));
+        let args = json!({ "value": null });
+        let result = validate_tool_arguments(&tool, &args).unwrap();
+        assert_eq!(result, json!({ "value": null }));
     }
 
     #[test]
-    #[ignore = "validate_tool_arguments needs enhancement: preserving values that already match a nullable union arm is not implemented"]
     fn preserves_a_value_that_already_matches_a_nullable_union_arm() {
-        // TS: Union [Number, Null] with value null → preserved.
-        // Rust: no union type handling.
+        let tool = make_tool(json!({
+            "type": "object",
+            "properties": {
+                "value": { "anyOf": [{ "type": "number" }, { "type": "null" }] }
+            },
+            "required": ["value"],
+        }));
+        let args = json!({ "value": null });
+        let result = validate_tool_arguments(&tool, &args).unwrap();
+        assert_eq!(result, json!({ "value": null }));
     }
 
     #[test]
-    #[ignore = "validate_tool_arguments needs enhancement: preserving values that already match a oneOf nullable union arm is not implemented"]
     fn preserves_a_value_that_already_matches_a_oneof_nullable_union_arm() {
-        // TS: oneOf [number, null] with value null → preserved.
-        // Rust: no oneOf handling.
+        let (tool, args) = make_tool_with_value_schema(
+            json!({ "oneOf": [{ "type": "number" }, { "type": "null" }] }),
+            json!(null),
+        );
+        let result = validate_tool_arguments(&tool, &args).unwrap();
+        assert_eq!(result, json!({ "value": null }));
     }
 
     #[test]
-    #[ignore = "validate_tool_arguments needs enhancement: coercing nullable unions when the original value does not match any arm is not implemented"]
     fn still_coerces_nullable_unions_when_the_original_value_does_not_match_any_arm() {
-        // TS: anyOf [number, null] with "42" → coerced to 42.
-        // Rust: no anyOf coercion.
+        let (tool, args) = make_tool_with_value_schema(
+            json!({ "anyOf": [{ "type": "number" }, { "type": "null" }] }),
+            json!("42"),
+        );
+        let result = validate_tool_arguments(&tool, &args).unwrap();
+        assert_eq!(result, json!({ "value": 42 }));
     }
 
     #[test]
-    #[ignore = "validate_tool_arguments needs enhancement: accepting null for nullable array schemas with items is not implemented"]
     fn accepts_null_for_nullable_array_schemas_with_items() {
-        // TS: type [array, null] with items {type: string} accepts null.
-        // Rust: no multi-type array validation.
+        let (tool, args) = make_tool_with_value_schema(
+            json!({ "type": ["array", "null"], "items": { "type": "string" } }),
+            json!(null),
+        );
+        let result = validate_tool_arguments(&tool, &args).unwrap();
+        assert_eq!(result, json!({ "value": null }));
     }
 
     #[test]
-    #[ignore = "validate_tool_arguments needs enhancement: rejecting invalid coercions (e.g. \"1\" for boolean, \"42.1\" for integer) is not implemented"]
     fn rejects_invalid_coercions_for_serialized_plain_json_schemas() {
-        // TS: throws "Validation failed" for invalid coercions.
-        // Rust: only checks is_object(), so these would pass incorrectly.
+        let failing_cases: Vec<(serde_json::Value, serde_json::Value)> = vec![
+            (json!({"type":"boolean"}), json!("1")),
+            (json!({"type":"boolean"}), json!("0")),
+            (json!({"type":"null"}), json!("null")),
+            (json!({"type":"integer"}), json!("42.1")),
+        ];
+
+        for (schema, input) in failing_cases {
+            let (tool, args) = make_tool_with_value_schema(schema.clone(), input.clone());
+            let result = validate_tool_arguments(&tool, &args);
+            assert!(result.is_err(), "should reject: schema={:?}, input={:?}", schema, input);
+            assert!(result.unwrap_err().contains("Validation failed"));
+        }
     }
 }
 
@@ -1327,9 +1428,14 @@ mod models_runtime {
         assert!(models.get_provider("p1").is_some());
         assert_eq!(models.list_providers().len(), 2);
 
-        // Note: delete_provider / clear_providers are not available in the
-        // current Rust Models API. The TS test also checks deletion and
-        // clearing — those assertions are skipped here.
+        // Delete p1
+        models.delete_provider("p1");
+        assert!(models.get_provider("p1").is_none());
+        assert_eq!(models.list_providers().len(), 1);
+
+        // Clear all providers
+        models.clear_providers();
+        assert!(models.list_providers().is_empty());
     }
 
     #[tokio::test]
@@ -1440,12 +1546,96 @@ mod models_runtime {
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    #[ignore = "requires InMemoryCredentialStore metadata enumeration matching TS CredentialStore.list()"]
-    async fn enumerates_credential_metadata_without_exposing_secrets() {}
+    async fn enumerates_credential_metadata_without_exposing_secrets() {
+        let credentials = InMemoryCredentialStore::new();
+
+        // api-provider: api_key credential carrying a secret
+        let api_modify: ModifyFn = Box::new(|_| {
+            Box::pin(async move {
+                Ok(Some(Credential::ApiKey(ApiKeyCredential {
+                    r#type: "api_key".into(),
+                    key: Some("secret".into()),
+                    env: None,
+                })))
+            })
+        });
+        credentials
+            .modify_fn("api-provider", api_modify, AuthOperationOptions::default())
+            .await
+            .unwrap();
+
+        // oauth-provider: oauth credential
+        let expires = chrono::Utc::now().timestamp_millis() + 60_000;
+        let oauth_modify: ModifyFn = Box::new(move |_| {
+            Box::pin(async move {
+                Ok(Some(Credential::OAuth(OAuthCredential {
+                    r#type: "oauth".into(),
+                    inner: OAuthCredentials {
+                        refresh: "refresh".into(),
+                        access: "access".into(),
+                        expires,
+                        extra: Default::default(),
+                    },
+                })))
+            })
+        });
+        credentials
+            .modify_fn("oauth-provider", oauth_modify, AuthOperationOptions::default())
+            .await
+            .unwrap();
+
+        let list = credentials
+            .list(AuthOperationOptions::default())
+            .await
+            .unwrap();
+        // list() returns metadata without exposing secrets
+        let mut entries: Vec<(String, String)> = list
+            .into_iter()
+            .map(|c| (c.provider_id, c.r#type))
+            .collect();
+        entries.sort();
+        assert_eq!(
+            entries,
+            vec![
+                ("api-provider".to_string(), "api_key".to_string()),
+                ("oauth-provider".to_string(), "oauth".to_string()),
+            ]
+        );
+    }
 
     #[tokio::test]
-    #[ignore = "requires provider source failure swallowing in Models.getModels()"]
-    async fn swallows_provider_source_failures_for_both_all_provider_and_single_provider_listing() {}
+    async fn swallows_provider_source_failures_for_both_all_provider_and_single_provider_listing() {
+        let models = create_models();
+
+        // "broken" provider: registered but never successfully refreshed,
+        // so its model cache stays empty — the Rust-semantic equivalent of
+        // the TS test where getModels() throws and Models.getModels()
+        // swallows the error, leaving only healthy providers' models.
+        let broken = register_faux_provider(Some(RegisterFauxProviderOptions {
+            provider: Some("broken".into()),
+            ..Default::default()
+        }));
+        models.set_provider_arc(broken.provider.clone());
+        let ok = register_faux_provider(Some(RegisterFauxProviderOptions {
+            provider: Some("ok".into()),
+            models: vec![FauxModelDefinition {
+                id: "m1".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }));
+        models.set_provider_arc(ok.provider.clone());
+        // Only refresh the healthy provider; "broken" is left with an empty cache.
+        models.refresh_provider_models("ok", false, true).await.unwrap();
+
+        // all-provider listing only includes the "ok" provider's model
+        let all_ids: Vec<String> =
+            models.list_models(None).into_iter().map(|m| m.id).collect();
+        assert_eq!(all_ids, vec!["m1".to_string()]);
+
+        // single-provider listing for the broken provider returns empty
+        assert!(models.list_models(Some("broken")).is_empty());
+    }
 
     #[tokio::test]
     #[ignore = "requires dynamic provider refresh with RefreshModelsContext publish()"]

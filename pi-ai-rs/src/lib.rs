@@ -12,14 +12,15 @@
 //! use pi_ai_rs::*;
 //! use pi_ai_rs::types::*;
 //! use pi_ai_rs::models::create_models;
-//! use pi_ai_rs::providers::faux::faux_provider;
+//! use pi_ai_rs::providers::faux::register_faux_provider;
 //!
 //! # async fn example() -> anyhow::Result<()> {
 //! // 1. Create the models registry
 //! let models = create_models();
 //!
 //! // 2. Register a provider
-//! models.set_provider(faux_provider());
+//! let reg = register_faux_provider(None);
+//! models.set_provider_arc(reg.provider.clone());
 //!
 //! // 3. Refresh the model catalog
 //! models.refresh_all(false, true).await?;

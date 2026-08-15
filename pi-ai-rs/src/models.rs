@@ -79,6 +79,22 @@ impl Models {
         self.providers.read().get(provider_id).cloned()
     }
 
+    /// Remove a single provider (and its cached models) from the registry.
+    pub fn delete_provider(&self, provider_id: &str) {
+        self.providers.write().remove(provider_id);
+        self.provider_models.write().remove(provider_id);
+        self.model_index
+            .write()
+            .retain(|(pid, _), _| pid != provider_id);
+    }
+
+    /// Remove every registered provider (and their cached models).
+    pub fn clear_providers(&self) {
+        self.providers.write().clear();
+        self.provider_models.write().clear();
+        self.model_index.write().clear();
+    }
+
     pub async fn refresh_provider_models(
         &self,
         provider_id: &str,
