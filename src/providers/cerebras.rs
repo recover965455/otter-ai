@@ -40,6 +40,7 @@ fn default_models() -> Vec<Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(8_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "llama3.1-70b".into(),
@@ -60,6 +61,7 @@ fn default_models() -> Vec<Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(8_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ]
 }

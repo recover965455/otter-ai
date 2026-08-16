@@ -67,7 +67,7 @@ async fn complete_with_model(
 fn user_context(text: &str) -> Context {
     Context {
         messages: vec![Message::User {
-            content: vec![ContentBlock::Text { text: text.into() }],
+            content: vec![ContentBlock::Text { text: text.into(), text_signature: None}],
             timestamp: 0,
         }],
         ..Default::default()
@@ -103,6 +103,7 @@ fn test_model(provider: &str, id: &str) -> Model {
         cost_rates: ModelCostRates::default(),
         context_window: Some(10000),
         default_temperature: None,
+        thinking_level_map: None,
     }
 }
 
@@ -126,7 +127,8 @@ mod faux_provider {
             messages: vec![Message::User {
                 content: vec![ContentBlock::Text {
                     text: "hi there".into(),
-                }],
+                text_signature: None,
+            }],
                 timestamp: 0,
             }],
             ..Default::default()
@@ -139,8 +141,9 @@ mod faux_provider {
                 assert_eq!(
                     content,
                     &vec![ContentBlock::Text {
-                        text: "hello world".into()
-                    }]
+                        text: "hello world".into(),
+                    text_signature: None,
+                }]
                 );
             }
             _ => panic!("expected assistant message"),
@@ -191,7 +194,7 @@ mod faux_provider {
                 ));
                 assert!(matches!(
                     &content[2],
-                    ContentBlock::Text { text } if text == "done"
+                    ContentBlock::Text { text, .. } if text == "done"
                 ));
                 assert_eq!(stop_reason.as_deref(), Some("toolUse"));
             }
@@ -254,8 +257,9 @@ mod faux_provider {
                 assert_eq!(
                     content,
                     &vec![ContentBlock::Text {
-                        text: "faux-fast:false".into()
-                    }]
+                        text: "faux-fast:false".into(),
+                    text_signature: None,
+                }]
                 );
             }
             _ => panic!("expected assistant message"),
@@ -268,8 +272,9 @@ mod faux_provider {
                 assert_eq!(
                     content,
                     &vec![ContentBlock::Text {
-                        text: "faux-thinker:true".into()
-                    }]
+                        text: "faux-thinker:true".into(),
+                    text_signature: None,
+                }]
                 );
             }
             _ => panic!("expected assistant message"),
@@ -334,8 +339,9 @@ mod faux_provider {
                 assert_eq!(
                     content,
                     &vec![ContentBlock::Text {
-                        text: "first".into()
-                    }]
+                        text: "first".into(),
+                    text_signature: None,
+                }]
                 );
             }
             _ => panic!("expected assistant message"),
@@ -349,8 +355,9 @@ mod faux_provider {
                 assert_eq!(
                     content,
                     &vec![ContentBlock::Text {
-                        text: "second".into()
-                    }]
+                        text: "second".into(),
+                    text_signature: None,
+                }]
                 );
             }
             _ => panic!("expected assistant message"),
@@ -389,8 +396,9 @@ mod faux_provider {
                 assert_eq!(
                     content,
                     &vec![ContentBlock::Text {
-                        text: "first".into()
-                    }]
+                        text: "first".into(),
+                    text_signature: None,
+                }]
                 );
             }
             _ => panic!("expected assistant"),
@@ -411,8 +419,9 @@ mod faux_provider {
                 assert_eq!(
                     content,
                     &vec![ContentBlock::Text {
-                        text: "second".into()
-                    }]
+                        text: "second".into(),
+                    text_signature: None,
+                }]
                 );
             }
             _ => panic!("expected assistant"),
@@ -438,8 +447,9 @@ mod faux_provider {
                 assert_eq!(
                     content,
                     &vec![ContentBlock::Text {
-                        text: "third".into()
-                    }]
+                        text: "third".into(),
+                    text_signature: None,
+                }]
                 );
             }
             _ => panic!("expected assistant"),
@@ -451,8 +461,9 @@ mod faux_provider {
                 assert_eq!(
                     content,
                     &vec![ContentBlock::Text {
-                        text: "fourth".into()
-                    }]
+                        text: "fourth".into(),
+                    text_signature: None,
+                }]
                 );
             }
             _ => panic!("expected assistant"),
@@ -479,7 +490,7 @@ mod faux_provider {
             .unwrap();
         match &response {
             Message::Assistant { content, .. } => {
-                assert_eq!(content, &vec![ContentBlock::Text { text: "1:1".into() }]);
+                assert_eq!(content, &vec![ContentBlock::Text { text: "1:1".into(), text_signature: None}]);
             }
             _ => panic!("expected assistant message"),
         }
@@ -577,6 +588,7 @@ mod faux_provider {
                 "properties": { "text": { "type": "string" } },
                 "required": ["text"]
             }),
+            constrained_sampling: None,
         };
 
         let context = Context {
@@ -586,7 +598,8 @@ mod faux_provider {
                     content: vec![
                         ContentBlock::Text {
                             text: "hello".into(),
-                        },
+                        text_signature: None,
+                    },
                         ContentBlock::Image(ImageContent {
                             content_type: "image".into(),
                             data: "abcd".into(),
@@ -601,7 +614,8 @@ mod faux_provider {
                     tool_name: "echo".into(),
                     content: vec![ContentBlock::Text {
                         text: "tool out".into(),
-                    }],
+                    text_signature: None,
+                }],
                     is_error: false,
                     timestamp: 2,
                 },
@@ -664,7 +678,8 @@ mod faux_provider {
         context.messages.push(Message::User {
             content: vec![ContentBlock::Text {
                 text: "follow up".into(),
-            }],
+            text_signature: None,
+        }],
             timestamp: 1,
         });
 
@@ -705,7 +720,8 @@ mod faux_provider {
             messages: vec![Message::User {
                 content: vec![ContentBlock::Text {
                     text: "hello".into(),
-                }],
+                text_signature: None,
+            }],
                 timestamp: 0,
             }],
             ..Default::default()
@@ -728,7 +744,8 @@ mod faux_provider {
         context.messages.push(Message::User {
             content: vec![ContentBlock::Text {
                 text: "follow up".into(),
-            }],
+            text_signature: None,
+        }],
             timestamp: 1,
         });
 
@@ -772,7 +789,8 @@ mod faux_provider {
         context.messages.push(Message::User {
             content: vec![ContentBlock::Text {
                 text: "follow up".into(),
-            }],
+            text_signature: None,
+        }],
             timestamp: 1,
         });
 
@@ -1179,6 +1197,7 @@ mod validation {
             name: "echo".into(),
             description: Some("Echo tool".into()),
             parameters,
+            constrained_sampling: None,
         }
     }
 
@@ -1384,6 +1403,7 @@ mod models_runtime {
             output: 100_000,
             cache_read: 72_000,
             cache_write,
+            reasoning: 0,
             total_tokens: 372_000 + cache_write,
             cost: UsageCost::default(),
         };
@@ -1593,7 +1613,6 @@ mod models_runtime {
         let api_modify: ModifyFn = Box::new(|_| {
             Box::pin(async move {
                 Ok(Some(Credential::ApiKey(ApiKeyCredential {
-                    r#type: "api_key".into(),
                     key: Some("secret".into()),
                     env: None,
                 })))
@@ -1609,7 +1628,6 @@ mod models_runtime {
         let oauth_modify: ModifyFn = Box::new(move |_| {
             Box::pin(async move {
                 Ok(Some(Credential::OAuth(OAuthCredential {
-                    r#type: "oauth".into(),
                     inner: OAuthCredentials {
                         refresh: "refresh".into(),
                         access: "access".into(),

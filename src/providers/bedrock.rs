@@ -61,7 +61,6 @@ impl ApiKeyAuth for BedrockAuth {
             })
             .await?;
         Ok(crate::auth::types::ApiKeyCredential {
-            r#type: "api_key".into(),
             key: Some(key),
             env: None,
         })
@@ -153,6 +152,7 @@ pub fn bedrock_provider() -> BedrockProvider {
             },
             context_window: Some(200_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "meta.llama3-2-70b-instruct-v1:0".into(),
@@ -173,6 +173,7 @@ pub fn bedrock_provider() -> BedrockProvider {
             cost_rates: ModelCostRates::default(),
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ];
     BedrockProvider::new(

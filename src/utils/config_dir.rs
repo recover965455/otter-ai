@@ -188,8 +188,13 @@ fn home_from_passwd() -> Option<PathBuf> {
 mod tests {
     use super::*;
 
+    /// Tests below mutate process-wide env vars; serialise them so parallel
+    /// test threads don't race on `OTTER_CONFIG_DIR`.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn env_override_is_respected() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let key = OTTER_CONFIG_DIR_ENV;
         // SAFETY: tests run in-process, override only within this block.
         std::env::set_var(key, "/tmp/otter-test-override");
@@ -200,6 +205,7 @@ mod tests {
 
     #[test]
     fn resolves_a_directory_when_home_exists() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // In CI / dev environments at least one of $HOME / $USERPROFILE is
         // always set, so config_dir() shouldn't be None.
         let got = config_dir().unwrap();
@@ -214,6 +220,7 @@ mod tests {
 
     #[test]
     fn config_path_appends_relative_segment() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let key = OTTER_CONFIG_DIR_ENV;
         std::env::set_var(key, "/tmp/otter-cfg");
         let p = config_path("agent/auth.json").unwrap().unwrap();

@@ -22,6 +22,7 @@ pub fn calculate_usage_cost(
         output: output_tokens,
         cache_read: cache_read_tokens,
         cache_write: cache_write_tokens,
+        reasoning: 0,
         total_tokens: input_tokens + output_tokens + cache_read_tokens + cache_write_tokens,
         cost: UsageCost::default(),
     };
@@ -81,6 +82,7 @@ pub fn tool_from_schema<T: JsonSchema + Serialize>(
         name: name.to_string(),
         description,
         parameters: value,
+        constrained_sampling: None,
     }
 }
 

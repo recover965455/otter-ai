@@ -45,7 +45,6 @@ impl ApiKeyAuth for AnthropicApiKeyAuth {
             })
             .await?;
         Ok(crate::auth::types::ApiKeyCredential {
-            r#type: "api_key".to_string(),
             key: Some(key),
             env: None,
         })
@@ -143,6 +142,7 @@ pub fn anthropic_provider() -> AnthropicProvider {
             },
             context_window: Some(200000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "claude-3-opus-latest".to_string(),
@@ -169,6 +169,7 @@ pub fn anthropic_provider() -> AnthropicProvider {
             },
             context_window: Some(200000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "claude-3-7-sonnet-latest".to_string(),
@@ -195,6 +196,7 @@ pub fn anthropic_provider() -> AnthropicProvider {
             },
             context_window: Some(200000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ];
     AnthropicProvider::new(

@@ -43,6 +43,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "llama-3.1-8b-instant".into(),
@@ -67,6 +68,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "mixtral-8x7b-32768".into(),
@@ -91,6 +93,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(32_768),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ]
 }

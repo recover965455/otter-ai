@@ -56,6 +56,9 @@ pub struct Usage {
     pub output: u64,
     pub cache_read: u64,
     pub cache_write: u64,
+    /// Reasoning tokens reported via `output_tokens_details.reasoning_tokens`.
+    #[serde(default)]
+    pub reasoning: u64,
     pub total_tokens: u64,
     pub cost: UsageCost,
 }
@@ -89,6 +92,10 @@ pub struct Model {
     pub cost_rates: ModelCostRates,
     pub context_window: Option<u64>,
     pub default_temperature: Option<f32>,
+    /// Provider-specific thinking-level remapping (TS: `thinkingLevelMap`),
+    /// e.g. `{ "minimal": "low", "xhigh": "xhigh" }` for Codex models.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking_level_map: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,6 +104,27 @@ pub struct Tool {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub parameters: serde_json::Value,
+    /// TS: `constrainedSampling` — grammar constrained sampling config used
+    /// by Codex models; grammar tools stream as `custom_tool_call` items.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub constrained_sampling: Option<ToolConstrainedSampling>,
+}
+
+/// TS: `ToolConstrainedSampling` (only `type: "grammar"` is honoured).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ToolConstrainedSampling {
+    #[serde(rename = "type")]
+    pub sampling_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variants: Option<ToolGrammarVariants>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ToolGrammarVariants {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub openai_lark: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub openai_regex: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -113,6 +141,13 @@ pub struct ImageContent {
 pub enum ContentBlock {
     Text {
         text: String,
+        /// Encoded message identity for OpenAI Responses replay
+        /// (TS: `textSignature`, `{"v":1,"id":"msg_…"}` shape). Lets the
+        /// assistant message round-trip with its server-assigned item id so
+        /// multi-turn prompt-cache affinity and websocket delta
+        /// continuations keep matching prefixes.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        text_signature: Option<String>,
     },
     Thinking {
         thinking: String,
@@ -162,6 +197,9 @@ pub enum Message {
         error_message: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         response_id: Option<String>,
+        /// Codex `response.end_turn` flag (TS: `endTurn`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        end_turn: Option<bool>,
         #[serde(default = "default_timestamp")]
         timestamp: i64,
     },
@@ -187,7 +225,7 @@ pub enum Message {
 impl Message {
     pub fn user_from_string<S: Into<String>>(text: S) -> Self {
         Message::User {
-            content: vec![ContentBlock::Text { text: text.into() }],
+            content: vec![ContentBlock::Text { text: text.into(), text_signature: None}],
             timestamp: default_timestamp(),
         }
     }
@@ -202,8 +240,50 @@ impl Message {
             stop_reason: None,
             error_message: None,
             response_id: None,
+            end_turn: None,
             timestamp: default_timestamp(),
         }
+    }
+
+    pub fn with_content(mut self, content: Vec<ContentBlock>) -> Self {
+        if let Message::Assistant {
+            content: ref mut c, ..
+        } = self
+        {
+            *c = content;
+        }
+        self
+    }
+
+    pub fn with_model(mut self, model: Option<String>) -> Self {
+        if let Message::Assistant {
+            model: ref mut m, ..
+        } = self
+        {
+            *m = model;
+        }
+        self
+    }
+
+    pub fn with_usage(mut self, usage: Usage) -> Self {
+        if let Message::Assistant {
+            usage: ref mut u, ..
+        } = self
+        {
+            *u = usage;
+        }
+        self
+    }
+
+    pub fn with_stop_reason(mut self, reason: Option<String>) -> Self {
+        if let Message::Assistant {
+            stop_reason: ref mut sr,
+            ..
+        } = self
+        {
+            *sr = reason;
+        }
+        self
     }
 
     pub fn with_error_message<S: Into<String>>(mut self, msg: S) -> Self {
@@ -274,12 +354,23 @@ pub struct ProviderRequestOptions {
     pub headers: ProviderHeaders,
     pub extra_body: Option<serde_json::Value>,
     pub query_params: HashMap<String, String>,
+    /// Per-request base URL override (TS: provider config / stream options
+    /// `baseUrl`). When `None`, the provider's configured base URL is used.
+    pub base_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct ApiStreamOptions {
     pub signal: Option<CancellationToken>,
     pub request_options: ProviderRequestOptions,
+    /// Maximum number of retries after rate limits / transient errors
+    /// (TS: `maxRetries`; Codex default 0).
+    pub max_retries: Option<u32>,
+    /// Upper bound for server-requested retry delays (TS: `maxRetryDelayMs`;
+    /// Codex default 60 000 ms; `Some(0)` disables the cap).
+    pub max_retry_delay_ms: Option<u64>,
+    /// HTTP response-header timeout (TS: `timeoutMs`).
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -290,9 +381,14 @@ pub struct SimpleStreamOptions {
     pub response_format: Option<ResponseFormat>,
     pub tool_choice: Option<ToolChoice>,
     pub thinking: Option<ModelThinkingLevel>,
+    /// Raw reasoning effort override (TS: `reasoning`), e.g. `"minimal"`,
+    /// `"xhigh"`, `"max"` or `"off"`.
+    pub reasoning: Option<String>,
     pub provider_extra: Option<serde_json::Value>,
     pub session_id: Option<String>,
     pub cache_retention: Option<CacheRetention>,
+    /// Per-request base URL override routed through to the provider adapter.
+    pub base_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -354,7 +450,7 @@ pub fn content_text(content: &[ContentBlock]) -> String {
     content
         .iter()
         .filter_map(|block| match block {
-            ContentBlock::Text { text } => Some(text.clone()),
+            ContentBlock::Text { text, .. } => Some(text.clone()),
             _ => None,
         })
         .collect::<Vec<_>>()
@@ -390,6 +486,13 @@ impl CancellationToken {
     pub fn child_token(&self) -> Self {
         Self {
             inner: self.inner.clone(),
+        }
+    }
+
+    /// Future that resolves once the token is cancelled (for `select!`).
+    pub async fn cancelled_fut(&self) {
+        while !self.is_cancelled() {
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
     }
 }

@@ -57,7 +57,6 @@ impl ApiKeyAuth for GoogleGenAiAuth {
             })
             .await?;
         Ok(crate::auth::types::ApiKeyCredential {
-            r#type: "api_key".into(),
             key: Some(key),
             env: None,
         })
@@ -152,6 +151,7 @@ pub fn google_generative_ai_provider() -> GoogleGenerativeAiProvider {
             },
             context_window: Some(1_000_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "gemini-2.0-flash".into(),
@@ -176,6 +176,7 @@ pub fn google_generative_ai_provider() -> GoogleGenerativeAiProvider {
             },
             context_window: Some(1_000_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ];
     GoogleGenerativeAiProvider::new(

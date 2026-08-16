@@ -43,6 +43,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(1_048_576),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "grok-3-mini-fast".into(),
@@ -67,6 +68,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ]
 }

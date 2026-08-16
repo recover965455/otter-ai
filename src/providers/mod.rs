@@ -8,6 +8,7 @@ use crate::utils::event_stream::AssistantMessageEventStream;
 // Shared primitives used by most providers below.
 pub mod oauth_compat;
 pub mod openai_compat;
+pub mod openai_responses;
 
 // Built-in providers (opt-in at compile time via feature flags; "faux" is
 // always available because it's the test mock everyone builds on top of).

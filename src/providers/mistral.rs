@@ -44,6 +44,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(128_000),
             default_temperature: Some(0.7),
+            thinking_level_map: None,
         },
         Model {
             id: "mistral-small-latest".into(),
@@ -68,6 +69,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(32_000),
             default_temperature: Some(0.7),
+            thinking_level_map: None,
         },
         Model {
             id: "codestral-latest".into(),
@@ -92,6 +94,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(80_000),
             default_temperature: Some(0.7),
+            thinking_level_map: None,
         },
     ]
 }

@@ -55,6 +55,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(200_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "openai/gpt-4o-mini".into(),
@@ -79,6 +80,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "google/gemini-2.5-pro-exp-03-25:free".into(),
@@ -99,6 +101,7 @@ fn default_models() -> Vec<Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(1_000_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ]
 }

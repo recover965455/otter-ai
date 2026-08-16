@@ -33,7 +33,7 @@
 //! let context = Context {
 //!     system_prompt: Some("You are a helpful assistant.".into()),
 //!     messages: vec![Message::User {
-//!         content: vec![ContentBlock::Text { text: "Hello!".into() }],
+//!         content: vec![ContentBlock::Text { text: "Hello!".into(), text_signature: None}],
 //!         timestamp: chrono::Utc::now().timestamp_millis(),
 //!     }],
 //!     ..Default::default()
@@ -74,8 +74,8 @@ pub use models_store::{InMemoryModelsStore, ModelsStore, ModelsStoreEntry};
 
 // Re-exports from auth
 pub use auth::{
-    default_provider_auth_context, AuthContext, Credential, CredentialStore,
-    InMemoryCredentialStore, ModelAuth,
+    default_provider_auth_context, parse_loose_credential, AuthContext, Credential, CredentialStore,
+    FileCredentialStore, InMemoryCredentialStore, ModelAuth,
 };
 
 // Re-exports from utils
@@ -84,6 +84,9 @@ pub use utils::{
     ensure_config_dir, parse_partial_json, string_enum_schema, tool_from_schema,
     validate_tool_arguments, with_retry, AssistantMessageEventStream, EventStream, RetryConfig,
 };
+
+// Re-export async-trait for test/provider impls built on top of otter-ai.
+pub use async_trait::async_trait;
 
 // Re-export schemars for schema generation (replaces TypeBox from TS)
 pub use schemars;

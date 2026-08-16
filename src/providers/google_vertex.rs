@@ -58,7 +58,6 @@ impl ApiKeyAuth for GoogleVertexAuth {
             })
             .await?;
         Ok(crate::auth::types::ApiKeyCredential {
-            r#type: "api_key".into(),
             key: Some(key),
             env: None,
         })
@@ -157,6 +156,7 @@ pub fn google_vertex_provider() -> GoogleVertexProvider {
             },
             context_window: Some(1_000_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "gemini-2.0-flash".into(),
@@ -181,6 +181,7 @@ pub fn google_vertex_provider() -> GoogleVertexProvider {
             },
             context_window: Some(1_000_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ];
     GoogleVertexProvider::new(

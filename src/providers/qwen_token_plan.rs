@@ -41,6 +41,7 @@ fn default_models() -> Vec<Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "qwen-max".into(),
@@ -61,6 +62,7 @@ fn default_models() -> Vec<Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "qwen-turbo".into(),
@@ -81,6 +83,7 @@ fn default_models() -> Vec<Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ]
 }

@@ -12,28 +12,12 @@ pub struct ModelAuth {
     pub base_url: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ApiKeyCredential {
-    #[serde(default = "default_type_api_key")]
-    pub r#type: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub env: Option<ProviderEnv>,
-}
-
-fn default_type_api_key() -> String {
-    "api_key".to_string()
-}
-
-impl Default for ApiKeyCredential {
-    fn default() -> Self {
-        Self {
-            r#type: "api_key".to_string(),
-            key: None,
-            env: None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,27 +31,22 @@ pub struct OAuthCredentials {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OAuthCredential {
-    #[serde(default = "default_type_oauth")]
-    pub r#type: String,
     #[serde(flatten)]
     pub inner: OAuthCredentials,
 }
 
-fn default_type_oauth() -> String {
-    "oauth".to_string()
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type")]
 pub enum Credential {
+    #[serde(rename = "api_key")]
     ApiKey(ApiKeyCredential),
+    #[serde(rename = "oauth")]
     OAuth(OAuthCredential),
 }
 
 impl Credential {
     pub fn api_key(key: impl Into<String>) -> Self {
         Credential::ApiKey(ApiKeyCredential {
-            r#type: "api_key".to_string(),
             key: Some(key.into()),
             env: None,
         })

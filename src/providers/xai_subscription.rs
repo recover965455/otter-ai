@@ -48,6 +48,7 @@ fn default_models() -> Vec<crate::types::Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(1_048_576),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "grok-3".into(),
@@ -68,6 +69,7 @@ fn default_models() -> Vec<crate::types::Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(131_072),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ]
 }

@@ -48,6 +48,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "gpt-4o".into(),
@@ -72,6 +73,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "o3-mini".into(),
@@ -96,6 +98,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(200_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "o1".into(),
@@ -120,6 +123,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(200_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ]
 }

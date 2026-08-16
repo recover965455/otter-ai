@@ -249,26 +249,23 @@ impl Models {
                 context.tool_choice = options.tool_choice.clone();
             }
 
-            let auth_result = match me
-                .get_auth(&provider_id, AuthResolutionOverrides::default())
-                .await
-            {
+            let mut overrides = AuthResolutionOverrides::default();
+            if let Some(b) = &options.base_url {
+                overrides.base_url = Some(b.clone());
+            }
+            let auth_result = match me.get_auth(&provider_id, overrides).await {
                 Ok(a) => a,
                 Err(e) => {
                     yield AssistantMessageEvent::Error { reason: "auth-error".into(), error: e.to_string() };
                     return;
                 }
             };
-            let _ = auth_result;
 
-            let api_opts = ApiStreamOptions {
-                signal: options.signal.clone(),
-                ..Default::default()
-            };
-            let mut api_opts = api_opts;
+            let mut api_opts = build_api_options(&options, &auth_result);
             provider.apply_simple_options(&context, &options, &mut api_opts);
+            apply_session_options(&options, &mut api_opts);
 
-            let provider_stream = provider.stream_simple(&model, context, options);
+            let provider_stream = provider.stream(&model, context, api_opts);
             futures::pin_mut!(provider_stream);
             while let Some(evt) = provider_stream.next().await {
                 yield evt;
@@ -305,23 +302,23 @@ impl Models {
                 context.tool_choice = options.tool_choice.clone();
             }
 
+            let mut overrides = AuthResolutionOverrides::default();
+            if let Some(b) = &options.base_url {
+                overrides.base_url = Some(b.clone());
+            }
             let auth_result = me
-                .get_auth(&provider_id, AuthResolutionOverrides::default())
+                .get_auth(&provider_id, overrides)
                 .await
                 .map_err(|e| anyhow::anyhow!("{}", e))?;
-            let _ = auth_result;
 
-            let api_opts = ApiStreamOptions {
-                signal: options.signal.clone(),
-                ..Default::default()
-            };
-            let mut api_opts = api_opts;
+            let mut api_opts = build_api_options(&options, &auth_result);
             provider.apply_simple_options(&context, &options, &mut api_opts);
+            apply_session_options(&options, &mut api_opts);
 
             // complete via stream: consume events and return the Done message,
             // matching the behavior faux tests expect.
             use futures::StreamExt;
-            let mut stream = provider.stream_simple(&model, context, options);
+            let mut stream = provider.stream(&model, context, api_opts);
             let mut last_done: Option<AssistantMessage> = None;
             let mut last_error: Option<String> = None;
             while let Some(evt) = stream.next().await {
@@ -413,4 +410,58 @@ impl ModelsRef {
 
 pub fn create_models() -> Models {
     Models::new()
+}
+
+/// Merge resolved auth (Authorization header + base_url + extra headers) into
+/// the provider-level [`ApiStreamOptions`].
+fn build_api_options(
+    options: &SimpleStreamOptions,
+    auth_result: &crate::auth::types::AuthResult,
+) -> ApiStreamOptions {
+    let mut headers = auth_result.auth.headers.clone().unwrap_or_default();
+    if let Some(key) = &auth_result.auth.api_key {
+        headers
+            .entry("Authorization".to_string())
+            .or_insert_with(|| format!("Bearer {}", key));
+    }
+    let mut base_url = auth_result.auth.base_url.clone();
+    if let Some(b) = &options.base_url {
+        base_url = Some(b.clone());
+    }
+    ApiStreamOptions {
+        signal: options.signal.clone(),
+        request_options: crate::types::ProviderRequestOptions {
+            headers,
+            extra_body: None,
+            query_params: Default::default(),
+            base_url,
+        },
+        max_retries: None,
+        max_retry_delay_ms: None,
+        timeout_ms: None,
+    }
+}
+
+/// Serialize session-cache knobs into `extra_body` so wire adapters dispatched
+/// through `provider.stream` (Codex, faux, …) can read them back.
+fn apply_session_options(options: &SimpleStreamOptions, api_opts: &mut ApiStreamOptions) {
+    let retention = match options.cache_retention.unwrap_or_default() {
+        crate::types::CacheRetention::None => "none",
+        crate::types::CacheRetention::Short => "short",
+        crate::types::CacheRetention::Long => "long",
+    };
+    if options.session_id.is_some() || options.cache_retention.is_some() {
+        let mut extra = api_opts
+            .request_options
+            .extra_body
+            .clone()
+            .unwrap_or_else(|| serde_json::json!({}));
+        if let Some(obj) = extra.as_object_mut() {
+            if let Some(sid) = &options.session_id {
+                obj.insert("session_id".into(), serde_json::json!(sid));
+            }
+            obj.insert("cache_retention".into(), serde_json::json!(retention));
+        }
+        api_opts.request_options.extra_body = Some(extra);
+    }
 }

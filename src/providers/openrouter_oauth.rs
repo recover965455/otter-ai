@@ -52,6 +52,7 @@ fn default_models() -> Vec<crate::types::Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(200_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "openai/gpt-4o".into(),
@@ -72,6 +73,7 @@ fn default_models() -> Vec<crate::types::Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ]
 }

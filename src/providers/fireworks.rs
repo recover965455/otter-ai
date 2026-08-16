@@ -44,6 +44,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "accounts/fireworks/models/llama-v3p1-70b-instruct".into(),
@@ -68,6 +69,7 @@ fn default_models() -> Vec<Model> {
             },
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "accounts/fireworks/models/deepseek-v3".into(),
@@ -88,6 +90,7 @@ fn default_models() -> Vec<Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(64_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ]
 }

@@ -38,9 +38,14 @@ parking_lot = "0.12"
 tracing = "0.1"
 rand = "0.8"
 hex = "0.4"
+http = { version = "1", optional = true }
+tokio-tungstenite = { version = "0.21", default-features = false, features = ["connect", "rustls-tls-webpki-roots"], optional = true }
+zstd = { version = "0.13", optional = true }
+sha2 = "0.10"
 
 [dev-dependencies]
 tokio-test = "0.4"
+tokio-tungstenite = { version = "0.21", default-features = false }
 
 [features]
 default = [
@@ -73,6 +78,8 @@ default = [
     "providers-xai",
     "providers-xai-subscription",
     "providers-zai",
+    "codex-websocket",
+    "codex-zstd",
 ]
 
 ## Provider integrations
@@ -139,3 +146,7 @@ providers-qwen-token-plan = []
 providers-radius = []
 # Enable xAI subscription (Grok/X subscription, device OAuth).
 providers-xai-subscription = []
+# Enable the Codex WebSocket transport (`transport: "auto"` prefers it and
+# falls back to SSE). Adds tokio-tungstenite + http.
+codex-websocket = ["dep:tokio-tungstenite", "dep:http"]
+codex-zstd = ["dep:zstd"]

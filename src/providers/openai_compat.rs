@@ -97,7 +97,6 @@ impl ApiKeyAuth for GenericCompatApiKeyAuth {
             })
             .await?;
         Ok(crate::auth::types::ApiKeyCredential {
-            r#type: "api_key".to_string(),
             key: Some(key),
             env: None,
         })

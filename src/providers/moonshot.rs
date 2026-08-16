@@ -43,6 +43,7 @@ fn default_models() -> Vec<Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(256_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "moonshot-v1-128k".into(),
@@ -63,6 +64,7 @@ fn default_models() -> Vec<Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(128_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "moonshot-v1-32k".into(),
@@ -83,6 +85,7 @@ fn default_models() -> Vec<Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(32_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ]
 }

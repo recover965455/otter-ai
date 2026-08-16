@@ -42,6 +42,7 @@ fn default_usage() -> Usage {
         output: 0,
         cache_read: 0,
         cache_write: 0,
+        reasoning: 0,
         total_tokens: 0,
         cost: UsageCost::default(),
     }
@@ -49,7 +50,7 @@ fn default_usage() -> Usage {
 
 // ---------- public helper types/functions (TS: fauxText, fauxThinking, fauxToolCall, fauxAssistantMessage) ----------
 pub fn faux_text(text: impl Into<String>) -> ContentBlock {
-    ContentBlock::Text { text: text.into() }
+    ContentBlock::Text { text: text.into(), text_signature: None}
 }
 
 pub fn faux_thinking(thinking: impl Into<String>) -> ContentBlock {
@@ -139,6 +140,7 @@ pub fn faux_assistant_message(
         stop_reason: Some(stop_reason),
         error_message: options.error_message,
         response_id: options.response_id,
+        end_turn: None,
         timestamp: ts,
     }
 }
@@ -240,7 +242,7 @@ fn content_to_text(content: &[ContentBlock]) -> String {
     content
         .iter()
         .map(|b| match b {
-            ContentBlock::Text { text } => text.clone(),
+            ContentBlock::Text { text, .. } => text.clone(),
             ContentBlock::Image(img) => {
                 format!(
                     "[image:{}:{}]",
@@ -260,7 +262,7 @@ fn assistant_content_to_text(content: &[ContentBlock]) -> String {
     content
         .iter()
         .map(|b| match b {
-            ContentBlock::Text { text } => text.clone(),
+            ContentBlock::Text { text, .. } => text.clone(),
             ContentBlock::Thinking { thinking, .. } => thinking.clone(),
             ContentBlock::ToolCall {
                 name, arguments, ..
@@ -282,7 +284,7 @@ fn message_to_text(msg: &Message) -> String {
         } => {
             let body = std::iter::once(tool_name.clone())
                 .chain(content.iter().map(|b| match b {
-                    ContentBlock::Text { text } => text.clone(),
+                    ContentBlock::Text { text, .. } => text.clone(),
                     _ => String::new(),
                 }))
                 .collect::<Vec<_>>()
@@ -361,6 +363,7 @@ fn with_usage_estimate(
             output: output_tokens,
             cache_read,
             cache_write,
+            reasoning: 0,
             total_tokens,
             cost: UsageCost::default(),
         };
@@ -432,6 +435,7 @@ fn create_error_message(
         stop_reason: Some("error".into()),
         error_message: Some(err),
         response_id: None,
+        end_turn: None,
         timestamp: chrono::Utc::now().timestamp_millis(),
     }
 }
@@ -592,14 +596,15 @@ async fn stream_with_deltas(
                     signature: signature.clone(),
                 });
             }
-            ContentBlock::Text { text } => {
+            ContentBlock::Text { text, .. } => {
                 if let Message::Assistant {
                     ref mut content, ..
                 } = &mut partial
                 {
                     content.push(ContentBlock::Text {
                         text: String::new(),
-                    });
+                    text_signature: None,
+                });
                 }
                 stream.push(AssistantMessageEvent::TextStart);
                 for chunk in split_by_token_size(text, min_token_size, max_token_size) {
@@ -612,7 +617,7 @@ async fn stream_with_deltas(
                         ref mut content, ..
                     } = &mut partial
                     {
-                        if let Some(ContentBlock::Text { ref mut text }) = content.get_mut(index) {
+                        if let Some(ContentBlock::Text { ref mut text, .. }) = content.get_mut(index) {
                             text.push_str(&chunk);
                         }
                     }
@@ -790,6 +795,7 @@ impl FauxCore {
                 cost_rates: def.cost_rates,
                 context_window: def.context_window,
                 default_temperature: None,
+                thinking_level_map: None,
             })
             .collect();
 
@@ -948,7 +954,6 @@ impl FauxProvider {
                 _: &(dyn AuthInteraction + Send + Sync),
             ) -> anyhow::Result<ApiKeyCredential> {
                 Ok(ApiKeyCredential {
-                    r#type: "api_key".into(),
                     key: Some("faux-api-key".into()),
                     env: None,
                 })
@@ -1003,11 +1008,26 @@ impl Provider for FauxProvider {
         context: Context,
         options: ApiStreamOptions,
     ) -> AssistantMessageEventStream {
-        let simple = SimpleStreamOptions {
+        let mut simple = SimpleStreamOptions {
             signal: options.signal,
-            provider_extra: options.request_options.extra_body,
+            provider_extra: options.request_options.extra_body.clone(),
             ..Default::default()
         };
+        // Restore session/cache knobs serialized by the Models layer into
+        // `extra_body` so the prompt-cache simulation keeps working when the
+        // request is routed through `provider.stream` instead of
+        // `stream_simple`.
+        if let Some(extra) = &options.request_options.extra_body {
+            if let Some(sid) = extra.get("session_id").and_then(|v| v.as_str()) {
+                simple.session_id = Some(sid.to_string());
+            }
+            match extra.get("cache_retention").and_then(|v| v.as_str()) {
+                Some("short") => simple.cache_retention = Some(CacheRetention::Short),
+                Some("long") => simple.cache_retention = Some(CacheRetention::Long),
+                Some("none") => simple.cache_retention = Some(CacheRetention::None),
+                _ => {}
+            }
+        }
         self.core.stream(model, context, Some(simple))
     }
     fn stream_simple(

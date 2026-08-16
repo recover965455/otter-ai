@@ -48,6 +48,7 @@ fn default_models() -> Vec<crate::types::Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(200_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "claude-opus-4-20250514".into(),
@@ -68,6 +69,7 @@ fn default_models() -> Vec<crate::types::Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(200_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
         Model {
             id: "claude-3-7-sonnet-20250219".into(),
@@ -88,6 +90,7 @@ fn default_models() -> Vec<crate::types::Model> {
             cost_rates: ModelCostRates::default(),
             context_window: Some(200_000),
             default_temperature: Some(1.0),
+            thinking_level_map: None,
         },
     ]
 }
