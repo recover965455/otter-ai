@@ -1,25 +1,62 @@
 #!/usr/bin/env bash
-# .githooks/pre-commit — Ensure README version/MSRV never drifts from Cargo.toml.
-# Runs `scripts/sync_readme_version.sh --check` before the user can commit
-# anything. If the check fails, the commit is aborted and we print the fix.
+# .githooks/pre-commit — local gate before every commit.
+#
+# Checks (in order, all must pass):
+#   1. README version/MSRV markers match Cargo.toml
+#      (scripts/sync_readme_version.sh --check)
+#   2. rustfmt clean on staged Rust files (cargo fmt --check)
+#   3. clippy --all-targets --all-features -D warnings (only when Rust
+#      files changed; skip with SKIP_CLIPPY=1 for quick iterations)
+#
+# Install once per clone:  bash scripts/install_hooks.sh
 set -euo pipefail
 ROOT="$(cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" && pwd)"
 cd "$ROOT"
 
+changed_rust() {
+  git diff --cached --name-only --diff-filter=ACM | grep -qE '\.(rs)$' || \
+  git diff --name-only --diff-filter=ACM | grep -qE '\.(rs)$'
+}
+
+# --- 1. README ↔ Cargo.toml sync -------------------------------------------
 if [[ ! -x scripts/sync_readme_version.sh ]]; then
   chmod +x scripts/sync_readme_version.sh 2>/dev/null || true
 fi
 
-if bash scripts/sync_readme_version.sh --check >/dev/null 2>&1; then
-  exit 0
+if ! bash scripts/sync_readme_version.sh --check >/dev/null 2>&1; then
+  echo ""
+  echo "🚫 pre-commit: README.md 版本信息与 Cargo.toml 不一致"
+  echo "   自动修复后重新提交："
+  echo ""
+  echo "     bash scripts/sync_readme_version.sh"
+  echo "     git add README.md"
+  echo ""
+  exit 1
 fi
 
-echo ""
-echo "🚫 pre-commit: README.md 版本信息与 Cargo.toml 不一致"
-echo "   自动修复并加入本次提交，请执行："
-echo ""
-echo "     bash scripts/sync_readme_version.sh"
-echo "     git add README.md"
-echo ""
-echo "   然后重新 git commit 即可。" >&2
-exit 1
+# --- 2. cargo fmt ----------------------------------------------------------
+if changed_rust; then
+  if ! cargo fmt --all -- --check >/dev/null 2>&1; then
+    echo ""
+    echo "🚫 pre-commit: cargo fmt --check 失败"
+    echo "   自动格式化并重新提交："
+    echo ""
+    echo "     cargo fmt --all"
+    echo "     git add -A"
+    echo ""
+    exit 1
+  fi
+
+  # --- 3. clippy -----------------------------------------------------------
+  if [[ "${SKIP_CLIPPY:-0}" != "1" ]]; then
+    if ! cargo clippy --all-targets --all-features -- -D warnings >/dev/null 2>&1; then
+      echo ""
+      echo "🚫 pre-commit: cargo clippy --all-targets --all-features -- -D warnings 失败"
+      echo "   修复警告后重新提交（临时跳过：SKIP_CLIPPY=1）"
+      echo ""
+      exit 1
+    fi
+  fi
+fi
+
+exit 0
