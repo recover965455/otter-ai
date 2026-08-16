@@ -1,8 +1,8 @@
 [package]
 name = "otter-ai"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.92"
 description = "Unified LLM API with provider collections, automatic auth resolution, token and cost tracking, and context persistence"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
@@ -11,7 +11,7 @@ homepage = "https://github.com/recover965455/otter-ai"
 documentation = "https://docs.rs/otter-ai"
 keywords = ["llm", "ai", "gpt", "openai", "anthropic"]
 categories = ["api-bindings", "asynchronous", "web-programming"]
-authors = ["Earendil Works <hello@earendil.works>"]
+authors = ["Mega <recover965455@gmail.com>"]
 exclude = [
     ".github/",
     "tests/",
