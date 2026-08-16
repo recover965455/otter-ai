@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit — Ensure README version/MSRV never drifts from Cargo.toml.
+# Runs `scripts/sync_readme_version.sh --check` before the user can commit
+# anything. If the check fails, the commit is aborted and we print the fix.
+set -euo pipefail
+ROOT="$(cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" && pwd)"
+cd "$ROOT"
+
+if [[ ! -x scripts/sync_readme_version.sh ]]; then
+  chmod +x scripts/sync_readme_version.sh 2>/dev/null || true
+fi
+
+if bash scripts/sync_readme_version.sh --check >/dev/null 2>&1; then
+  exit 0
+fi
+
+echo ""
+echo "🚫 pre-commit: README.md 版本信息与 Cargo.toml 不一致"
+echo "   自动修复并加入本次提交，请执行："
+echo ""
+echo "     bash scripts/sync_readme_version.sh"
+echo "     git add README.md"
+echo ""
+echo "   然后重新 git commit 即可。" >&2
+exit 1
