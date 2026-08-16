@@ -6,7 +6,7 @@
 
 > 统一的大语言模型 API SDK — 多提供商聚合、自动认证解析、Token 与成本追踪、上下文持久化。
 
-<!-- sync:version:BEGIN --> 📦 0.2.0 · 🦀 Rust ≥ 1.92 · Source: https://github.com/recover965455/otter-ai <!-- sync:version:END -->
+<!-- sync:version:BEGIN --> 📦 0.2.1 · 🦀 Rust ≥ 1.92 · Source: https://github.com/recover965455/otter-ai <!-- sync:version:END -->
 
 `otter-ai` 是 TypeScript 包 [`@earendil-works/pi-ai`](https://github.com/earendil-works/pi-ai) 的 Rust 重写版本，提供了一个统一的接口来与多个 LLM 提供商交互。
 
