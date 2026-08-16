@@ -1,6 +1,6 @@
 [package]
 name = "otter-ai"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 rust-version = "1.92"
 description = "Unified LLM API with provider collections, automatic auth resolution, token and cost tracking, and context persistence"
