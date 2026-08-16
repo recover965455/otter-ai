@@ -94,10 +94,7 @@ pub fn string_enum_schema(
     use serde_json::json;
     let mut map = serde_json::Map::new();
     map.insert("type".into(), json!("string"));
-    map.insert(
-        "enum".into(),
-        json!(values.iter().cloned().collect::<Vec<_>>()),
-    );
+    map.insert("enum".into(), json!(values.to_vec()));
     if let Some(desc) = description {
         map.insert("description".into(), json!(desc));
     }

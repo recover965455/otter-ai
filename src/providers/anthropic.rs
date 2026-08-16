@@ -63,7 +63,7 @@ impl ApiKeyAuth for AnthropicApiKeyAuth {
             Some(k) => (
                 Some(k),
                 credential
-                    .and_then(|_| Some("credential_store".to_string()))
+                    .map(|_| "credential_store".to_string())
                     .or(Some(format!("env:{}", self.env_var))),
             ),
             None => (None, None),

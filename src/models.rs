@@ -261,8 +261,11 @@ impl Models {
             };
             let _ = auth_result;
 
-            let mut api_opts = ApiStreamOptions::default();
-            api_opts.signal = options.signal.clone();
+            let api_opts = ApiStreamOptions {
+                signal: options.signal.clone(),
+                ..Default::default()
+            };
+            let mut api_opts = api_opts;
             provider.apply_simple_options(&context, &options, &mut api_opts);
 
             let provider_stream = provider.stream_simple(&model, context, options);
@@ -308,8 +311,11 @@ impl Models {
                 .map_err(|e| anyhow::anyhow!("{}", e))?;
             let _ = auth_result;
 
-            let mut api_opts = ApiStreamOptions::default();
-            api_opts.signal = options.signal.clone();
+            let api_opts = ApiStreamOptions {
+                signal: options.signal.clone(),
+                ..Default::default()
+            };
+            let mut api_opts = api_opts;
             provider.apply_simple_options(&context, &options, &mut api_opts);
 
             // complete via stream: consume events and return the Done message,
@@ -366,6 +372,7 @@ impl Models {
 }
 
 // A cheap cloneable reference to Models. Used internally by async stream/complete fns.
+#[allow(dead_code)]
 struct ModelsRef {
     providers: Arc<RwLock<HashMap<String, Arc<dyn Provider>>>>,
     model_index: Arc<RwLock<HashMap<(String, String), Model>>>,

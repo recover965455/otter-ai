@@ -16,8 +16,7 @@ use futures::StreamExt;
 use rand::Rng;
 
 use crate::auth::types::{
-    ApiKeyAuth, ApiKeyCredential, AuthCheck, AuthContext, AuthInteraction, AuthPrompt, AuthResult,
-    ProviderAuth,
+    ApiKeyAuth, ApiKeyCredential, AuthCheck, AuthContext, AuthInteraction, AuthResult, ProviderAuth,
 };
 use crate::providers::{Provider, RefreshModelsContext};
 use crate::types::{
@@ -162,6 +161,7 @@ pub type FauxResponseFactory = Arc<
         + Sync,
 >;
 
+#[allow(clippy::large_enum_variant)]
 pub enum FauxResponseStep {
     Message(AssistantMessage),
     Factory(FauxResponseFactory),
@@ -535,7 +535,7 @@ async fn stream_with_deltas(
     };
 
     let mut aborted_here = false;
-    let mut abort_emit_and_return =
+    let abort_emit_and_return =
         |stream: &AssistantMessageEventStream, partial: &AssistantMessage| -> bool {
             let a = create_aborted_message(partial.clone());
             stream.push(AssistantMessageEvent::Error {
@@ -703,7 +703,6 @@ async fn stream_with_deltas(
                 error: error_str(&err),
             });
             stream.end(Some(err));
-            return;
         }
         Some("error") | Some("aborted") => {
             let reason = terminal_stop_reason(&message).unwrap().to_string();
@@ -712,7 +711,6 @@ async fn stream_with_deltas(
                 error: error_str(&message),
             });
             stream.end(Some(message));
-            return;
         }
         Some(other) => {
             stream.push(AssistantMessageEvent::Usage {
@@ -1154,11 +1152,8 @@ pub async fn complete(
     let mut st = stream;
     let mut last_error: Option<String> = None;
     while let Some(evt) = st.next().await {
-        match evt {
-            AssistantMessageEvent::Error { error, .. } => {
-                last_error = Some(error);
-            }
-            _ => {}
+        if let AssistantMessageEvent::Error { error, .. } = evt {
+            last_error = Some(error);
         }
     }
     let msg = result_fut.await;
