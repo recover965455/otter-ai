@@ -206,10 +206,8 @@ fn is_nullable(schema: &serde_json::Value) -> bool {
     if let Some(t) = schema.get("type") {
         match t {
             serde_json::Value::String(s) if s == "null" => return true,
-            serde_json::Value::Array(arr) => {
-                if arr.iter().any(|v| v.as_str() == Some("null")) {
-                    return true;
-                }
+            serde_json::Value::Array(arr) if arr.iter().any(|v| v.as_str() == Some("null")) => {
+                return true;
             }
             _ => {}
         }
