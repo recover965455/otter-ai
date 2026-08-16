@@ -4,7 +4,9 @@
 use super::openai_compat::{build_compat_provider, CompatProviderSpec, GenericCompatProvider};
 use crate::types::{Model, ModelCostRates, ModelThinkingLevel};
 
-pub use super::openai_compat::{GenericCompatConfig as OpenAIProviderConfig, GenericCompatApiKeyAuth as OpenAIApiKeyAuth};
+pub use super::openai_compat::{
+    GenericCompatApiKeyAuth as OpenAIApiKeyAuth, GenericCompatConfig as OpenAIProviderConfig,
+};
 
 pub type OpenAIProvider = GenericCompatProvider;
 

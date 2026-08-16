@@ -88,7 +88,10 @@ impl ApiKeyAuth for GenericCompatApiKeyAuth {
         use crate::auth::types::AuthPrompt;
         let key = interaction
             .prompt(AuthPrompt::Secret {
-                message: format!("Enter your {} API key:", self.name.trim_end_matches(" API key")),
+                message: format!(
+                    "Enter your {} API key:",
+                    self.name.trim_end_matches(" API key")
+                ),
                 placeholder: Some(self.placeholder.clone()),
                 signal: interaction.signal().cloned(),
             })
@@ -201,8 +204,8 @@ impl Provider for GenericCompatProvider {
             "{} live adapter not available in this build (OpenAI-compat wire protocol shared adapter TBD)",
             self.name
         );
-        let msg =
-            Message::assistant_default(self.id.clone(), self.id.clone()).with_error_message(&err_msg);
+        let msg = Message::assistant_default(self.id.clone(), self.id.clone())
+            .with_error_message(&err_msg);
         es.push(AssistantMessageEvent::Error {
             reason: "error".into(),
             error: err_msg,

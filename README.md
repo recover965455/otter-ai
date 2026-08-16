@@ -108,6 +108,40 @@ SDK 会自动从环境变量读取各提供商的凭证（与 `@earendil-works/p
 
 也可以通过 `CredentialStore` trait 实现自定义凭证来源。
 
+### 配置目录（`~/.otter`）
+
+otter-ai 的本地配置文件统一存放在 **`~/.otter`** 目录下（区别于 TypeScript 版 pi-ai 使用的 `~/.pi`，二者并存互不干扰）。解析顺序：
+
+1. **环境变量覆盖** — `OTTER_CONFIG_DIR=/custom/path` 优先级最高。
+2. **XDG Base Directory** — 如果设置了 `XDG_CONFIG_HOME`，使用 `$XDG_CONFIG_HOME/otter`。
+3. **默认** — `~/.otter`（Windows 上为 `%USERPROFILE%\.otter`）。
+
+常用的子路径约定（与 pi-ai 保持语义一致，只是换了根目录）：
+
+| 文件 / 目录 | 用途 |
+|---|---|
+| `~/.otter/agent/auth.json` | `/login` 存储的 API Key / OAuth 凭证 |
+| `~/.otter/agent/models-store.json` | 离线模型目录缓存（`refresh_models(allow_network=false)` 时使用） |
+| `~/.otter/agent/models.json` | 用户自定义 provider / 模型声明（Ollama、vLLM、代理等） |
+
+SDK 提供三个便捷函数：
+
+```rust,no_run
+use otter_ai::{config_dir, config_path, ensure_config_dir};
+
+# async fn example() -> anyhow::Result<()> {
+// 获取配置根目录（~/.otter）
+let root = config_dir()?.expect("no home directory available");
+
+// 拼接子路径：~/.otter/agent/auth.json
+let auth_file = config_path("agent/auth.json")?.expect("no home directory available");
+
+// 创建多级目录（等价于 mkdir -p），返回最终路径
+let agent_dir = ensure_config_dir("agent")?.expect("no home directory available");
+# Ok(())
+# }
+```
+
 ---
 
 ## 快速开始

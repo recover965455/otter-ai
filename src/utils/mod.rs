@@ -1,8 +1,10 @@
+pub mod config_dir;
 pub mod event_stream;
 pub mod json_parse;
 pub mod retry;
 pub mod validation;
 
+pub use config_dir::{config_dir, config_path, ensure_config_dir, OTTER_CONFIG_DIR_ENV};
 pub use event_stream::{
     create_assistant_message_event_stream, AssistantMessageEventStream, EventStream,
 };

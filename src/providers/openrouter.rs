@@ -12,7 +12,10 @@ pub type OpenRouterProvider = GenericCompatProvider;
 
 pub fn openrouter_provider() -> OpenRouterProvider {
     let mut extra = HashMap::new();
-    extra.insert("HTTP-Referer".into(), "https://github.com/recover965455/otter-ai".into());
+    extra.insert(
+        "HTTP-Referer".into(),
+        "https://github.com/recover965455/otter-ai".into(),
+    );
     extra.insert("X-Title".into(), "otter-ai".into());
 
     build_compat_provider(CompatProviderSpec {
