@@ -1,13 +1,13 @@
-pub mod types;
 pub mod context;
+pub mod types;
 
 use crate::types::CancellationToken;
 pub use context::{default_provider_auth_context, DefaultAuthContext, InMemoryCredentialStore};
 pub use types::{
-    ApiKeyAuth, ApiKeyCredential, AuthCheck, AuthContext, AuthEvent, AuthInfoLink,
-    AuthInteraction, AuthOperationOptions, AuthPrompt, AuthResult, AuthSelectOption, AuthType,
-    Credential, CredentialInfo, CredentialStore, ModelAuth, OAuthAuth, OAuthCredential,
-    OAuthCredentials, ProviderAuth,
+    ApiKeyAuth, ApiKeyCredential, AuthCheck, AuthContext, AuthEvent, AuthInfoLink, AuthInteraction,
+    AuthOperationOptions, AuthPrompt, AuthResult, AuthSelectOption, AuthType, Credential,
+    CredentialInfo, CredentialStore, ModelAuth, OAuthAuth, OAuthCredential, OAuthCredentials,
+    ProviderAuth,
 };
 
 pub struct AuthResolutionOverrides {

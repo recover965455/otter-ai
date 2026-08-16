@@ -136,10 +136,8 @@ where
     }
 }
 
-pub type AssistantMessageEventStream = EventStream<
-    crate::types::AssistantMessageEvent,
-    crate::types::AssistantMessage,
->;
+pub type AssistantMessageEventStream =
+    EventStream<crate::types::AssistantMessageEvent, crate::types::AssistantMessage>;
 
 pub fn create_assistant_message_event_stream() -> AssistantMessageEventStream {
     use crate::types::{AssistantMessage, AssistantMessageEvent, Message};
@@ -160,7 +158,8 @@ pub fn create_assistant_message_event_stream() -> AssistantMessageEventStream {
                     ref mut stop_reason,
                     ref mut error_message,
                     ..
-                } = m {
+                } = m
+                {
                     *stop_reason = Some(reason.clone());
                     *error_message = Some(error.clone());
                 }

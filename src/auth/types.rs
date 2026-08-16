@@ -1,6 +1,6 @@
 use crate::types::{CancellationToken, ProviderEnv, ProviderHeaders};
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ModelAuth {
@@ -98,10 +98,7 @@ pub trait CredentialStore: Send + Sync {
         options: AuthOperationOptions,
     ) -> anyhow::Result<Option<Credential>>;
 
-    async fn list(
-        &self,
-        options: AuthOperationOptions,
-    ) -> anyhow::Result<Vec<CredentialInfo>>;
+    async fn list(&self, options: AuthOperationOptions) -> anyhow::Result<Vec<CredentialInfo>>;
 
     async fn modify_fn(
         &self,
@@ -110,11 +107,7 @@ pub trait CredentialStore: Send + Sync {
         options: AuthOperationOptions,
     ) -> anyhow::Result<Option<Credential>>;
 
-    async fn delete(
-        &self,
-        provider_id: &str,
-        options: AuthOperationOptions,
-    ) -> anyhow::Result<()>;
+    async fn delete(&self, provider_id: &str, options: AuthOperationOptions) -> anyhow::Result<()>;
 }
 
 pub trait AuthContext: Send + Sync {
@@ -252,8 +245,12 @@ pub trait ApiKeyAuth {
 #[async_trait::async_trait]
 pub trait OAuthAuth {
     fn name(&self) -> &str;
-    fn is_subscription(&self) -> bool { false }
-    fn login_label(&self) -> Option<&str> { None }
+    fn is_subscription(&self) -> bool {
+        false
+    }
+    fn login_label(&self) -> Option<&str> {
+        None
+    }
 
     async fn login(
         &self,

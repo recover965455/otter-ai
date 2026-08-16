@@ -39,7 +39,10 @@ pub fn calculate_cost(model: &Model, usage: &Usage) -> UsageCost {
         input_per_million: model.cost_rates.input_per_million.unwrap_or(0.0),
         output_per_million: model.cost_rates.output_per_million.unwrap_or(0.0),
         cache_read_per_million: model.cost_rates.input_cache_read_per_million.unwrap_or(0.0),
-        cache_write_per_million: model.cost_rates.input_cache_write_per_million.unwrap_or(0.0),
+        cache_write_per_million: model
+            .cost_rates
+            .input_cache_write_per_million
+            .unwrap_or(0.0),
     };
     let mut effective: &CostTier = &fallback;
     let mut sorted_tiers: Vec<&CostTier> = model.cost_rates.tiers.iter().collect();
@@ -72,9 +75,8 @@ pub fn tool_from_schema<T: JsonSchema + Serialize>(
     description: Option<String>,
 ) -> crate::types::Tool {
     let schema = schemars::schema_for!(T);
-    let value = serde_json::to_value(&schema.schema).unwrap_or(serde_json::Value::Object(
-        serde_json::Map::new(),
-    ));
+    let value = serde_json::to_value(&schema.schema)
+        .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
     crate::types::Tool {
         name: name.to_string(),
         description,
@@ -132,10 +134,7 @@ pub fn validate_tool_arguments(
     Ok(args)
 }
 
-fn coerce_object(
-    schema: &serde_json::Value,
-    value: &mut serde_json::Value,
-) -> Result<(), String> {
+fn coerce_object(schema: &serde_json::Value, value: &mut serde_json::Value) -> Result<(), String> {
     if !value.is_object() {
         return Ok(());
     }
@@ -231,10 +230,7 @@ fn is_nullable(schema: &serde_json::Value) -> bool {
     false
 }
 
-fn coerce_value(
-    schema: &serde_json::Value,
-    value: &mut serde_json::Value,
-) -> Result<(), String> {
+fn coerce_value(schema: &serde_json::Value, value: &mut serde_json::Value) -> Result<(), String> {
     // Handle anyOf
     if let Some(arr) = schema.get("anyOf").and_then(|v| v.as_array()) {
         return coerce_union(arr, value, false);
@@ -280,7 +276,10 @@ fn coerce_value(
         }
     }
 
-    Err(format!("value {:?} does not match any of {:?}", value, types))
+    Err(format!(
+        "value {:?} does not match any of {:?}",
+        value, types
+    ))
 }
 
 fn get_types(schema: &serde_json::Value) -> Vec<String> {
@@ -353,12 +352,10 @@ fn try_coerce_single(type_str: &str, value: &mut serde_json::Value) -> Result<bo
     match type_str {
         "number" => {
             *value = match value {
-                serde_json::Value::String(s) => {
-                    match s.parse::<f64>() {
-                        Ok(n) => json_number_from_f64(n),
-                        Err(_) => return Ok(false),
-                    }
-                }
+                serde_json::Value::String(s) => match s.parse::<f64>() {
+                    Ok(n) => json_number_from_f64(n),
+                    Err(_) => return Ok(false),
+                },
                 serde_json::Value::Bool(true) => serde_json::json!(1),
                 serde_json::Value::Bool(false) => serde_json::json!(0),
                 serde_json::Value::Null => serde_json::json!(0),
@@ -369,12 +366,10 @@ fn try_coerce_single(type_str: &str, value: &mut serde_json::Value) -> Result<bo
         }
         "integer" => {
             *value = match value {
-                serde_json::Value::String(s) => {
-                    match s.parse::<i64>() {
-                        Ok(n) => serde_json::json!(n),
-                        Err(_) => return Ok(false),
-                    }
-                }
+                serde_json::Value::String(s) => match s.parse::<i64>() {
+                    Ok(n) => serde_json::json!(n),
+                    Err(_) => return Ok(false),
+                },
                 serde_json::Value::Bool(true) => serde_json::json!(1),
                 serde_json::Value::Bool(false) => serde_json::json!(0),
                 serde_json::Value::Null => serde_json::json!(0),
@@ -432,9 +427,7 @@ fn try_coerce_single(type_str: &str, value: &mut serde_json::Value) -> Result<bo
             // Don't coerce, just accept if already array
             Ok(value.is_array())
         }
-        "object" => {
-            Ok(value.is_object())
-        }
+        "object" => Ok(value.is_object()),
         _ => Ok(true), // unknown type, accept
     }
 }

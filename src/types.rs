@@ -224,7 +224,11 @@ impl Message {
     }
 
     pub fn with_error_message<S: Into<String>>(mut self, msg: S) -> Self {
-        if let Message::Assistant { ref mut error_message, .. } = self {
+        if let Message::Assistant {
+            ref mut error_message,
+            ..
+        } = self
+        {
             *error_message = Some(msg.into());
         }
         self

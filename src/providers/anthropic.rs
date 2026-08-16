@@ -7,8 +7,8 @@ use crate::auth::types::{
     ApiKeyAuth, AuthContext, AuthInteraction, AuthResult, ModelAuth, ProviderAuth,
 };
 use crate::types::{
-    ApiStreamOptions, AssistantMessageEvent, Context, CancellationToken,
-    Message, Model, ModelCostRates, ModelThinkingLevel,
+    ApiStreamOptions, AssistantMessageEvent, CancellationToken, Context, Message, Model,
+    ModelCostRates, ModelThinkingLevel,
 };
 use crate::utils::event_stream::AssistantMessageEventStream;
 
