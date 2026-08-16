@@ -31,7 +31,7 @@ pub struct CostTier {
     pub cache_write_per_million: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ModelCostRates {
     pub input_per_million: Option<f64>,
     pub output_per_million: Option<f64>,
@@ -39,18 +39,6 @@ pub struct ModelCostRates {
     pub input_cache_write_per_million: Option<f64>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tiers: Vec<CostTier>,
-}
-
-impl Default for ModelCostRates {
-    fn default() -> Self {
-        Self {
-            input_per_million: None,
-            output_per_million: None,
-            input_cache_read_per_million: None,
-            input_cache_write_per_million: None,
-            tiers: vec![],
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -72,18 +60,13 @@ pub struct Usage {
     pub cost: UsageCost,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum ModelThinkingLevel {
+    #[default]
     None,
     Low,
     Medium,
     High,
-}
-
-impl Default for ModelThinkingLevel {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

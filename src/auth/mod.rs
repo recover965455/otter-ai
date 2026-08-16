@@ -10,20 +10,11 @@ pub use types::{
     ProviderAuth,
 };
 
+#[derive(Default)]
 pub struct AuthResolutionOverrides {
     pub credential: Option<Credential>,
     pub base_url: Option<String>,
     pub headers: Option<std::collections::HashMap<String, String>>,
-}
-
-impl Default for AuthResolutionOverrides {
-    fn default() -> Self {
-        Self {
-            credential: None,
-            base_url: None,
-            headers: None,
-        }
-    }
 }
 
 #[derive(thiserror::Error, Debug)]
