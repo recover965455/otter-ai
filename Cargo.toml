@@ -43,15 +43,63 @@ hex = "0.4"
 tokio-test = "0.4"
 
 [features]
-default = ["providers-openai", "providers-anthropic", "providers-faux"]
+default = [
+    "providers-openai",
+    "providers-anthropic",
+    "providers-faux",
+    "providers-azure",
+    "providers-bedrock",
+    "providers-cerebras",
+    "providers-cloudflare-ai-gateway",
+    "providers-cloudflare-workers-ai",
+    "providers-deepseek",
+    "providers-google",
+    "providers-groq",
+    "providers-mistral",
+    "providers-nvidia",
+    "providers-openrouter",
+    "providers-vercel-ai-gateway",
+    "providers-xai",
+    "providers-zai",
+]
 
 ## Provider integrations
+##
+## Default: every public provider (same as `@earendil-works/pi-ai` which ships
+## all backends).  Disable default-features and cherry-pick to shrink compile
+## time if you only need a subset.
 
 # Enable OpenAI-compatible provider (OpenAI, Azure OpenAI, etc.)
 providers-openai = []
-
 # Enable Anthropic provider (Claude models)
 providers-anthropic = []
-
 # Enable Faux provider (mock provider for testing)
 providers-faux = []
+# Enable Azure OpenAI (Responses API flavour).
+providers-azure = []
+# Enable Amazon Bedrock (ConverseStream protocol + bearer auth).
+providers-bedrock = []
+# Enable Cerebras ultra-fast inference provider.
+providers-cerebras = []
+# Enable Cloudflare AI Gateway proxy.
+providers-cloudflare-ai-gateway = []
+# Enable Cloudflare Workers AI edge inference provider.
+providers-cloudflare-workers-ai = []
+# Enable DeepSeek (chat + reasoner).
+providers-deepseek = []
+# Enable Google Generative AI (Gemini family).
+providers-google = []
+# Enable Groq ultra-fast inference.
+providers-groq = []
+# Enable Mistral / Codestral provider.
+providers-mistral = []
+# Enable NVIDIA NIM inference.
+providers-nvidia = []
+# Enable OpenRouter aggregator (auto-sends Referer + X-Title headers).
+providers-openrouter = []
+# Enable Vercel AI Gateway proxy.
+providers-vercel-ai-gateway = []
+# Enable xAI (Grok) provider.
+providers-xai = []
+# Enable ZAI / Codin provider.
+providers-zai = []

@@ -45,11 +45,27 @@ otter-ai = "0.1"
 
 ## 功能标志
 
+`otter-ai` 默认启用所有内置 provider（与 `@earendil-works/pi-ai` 的打包策略一致）。如需只启用少量 provider 以缩短编译时间，请使用 `default-features = false` 再手动开启需要的 feature。
+
 | 标志 | 默认 | 说明 |
 |------|------|------|
-| `providers-openai` | ✅ | 启用 OpenAI 兼容提供商（OpenAI、Azure OpenAI 等） |
-| `providers-anthropic` | ✅ | 启用 Anthropic 提供商（Claude 系列模型） |
-| `providers-faux` | ✅ | 启用 Faux Mock 提供商（用于离线测试） |
+| `providers-openai` | ✅ | OpenAI（GPT-4o / GPT-4o Mini / o1 / o3-mini，Chat Completions + Responses API） |
+| `providers-anthropic` | ✅ | Anthropic（Claude 3 Opus / 3.5 Sonnet / 3.7 Sonnet，Messages API + 缓存定价） |
+| `providers-faux` | ✅ | Faux Mock 提供商（用于离线测试、确定性单元测试） |
+| `providers-azure` | ✅ | Azure OpenAI Responses（`AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT`） |
+| `providers-bedrock` | ✅ | Amazon Bedrock（ConverseStream 协议 + SigV4 Bearer Token） |
+| `providers-cerebras` | ✅ | Cerebras 极速推理（Llama 系列） |
+| `providers-cloudflare-ai-gateway` | ✅ | Cloudflare AI Gateway（聚合代理） |
+| `providers-cloudflare-workers-ai` | ✅ | Cloudflare Workers AI（边缘推理，`@cf/*` 模型） |
+| `providers-deepseek` | ✅ | DeepSeek V3 Chat + R1 Reasoner |
+| `providers-google` | ✅ | Google Generative AI（Gemini 2.5 Pro / 2.0 Flash 等） |
+| `providers-groq` | ✅ | Groq 极速推理（Llama / Mixtral 系列） |
+| `providers-mistral` | ✅ | Mistral / Codestral |
+| `providers-nvidia` | ✅ | NVIDIA NIM（`integrate.api.nvidia.com/v1`） |
+| `providers-openrouter` | ✅ | OpenRouter 聚合网关（自动注入 `HTTP-Referer` / `X-Title` 头） |
+| `providers-vercel-ai-gateway` | ✅ | Vercel AI Gateway（代理 + 监控） |
+| `providers-xai` | ✅ | xAI（Grok 3 / 4 系列） |
+| `providers-zai` | ✅ | ZAI / Codin |
 
 只启用 OpenAI 的示例：
 
@@ -64,7 +80,7 @@ otter-ai = { version = "0.1", default-features = false, features = ["providers-o
 
 ### 环境变量
 
-SDK 会自动从环境变量读取各提供商的凭证：
+SDK 会自动从环境变量读取各提供商的凭证（与 `@earendil-works/pi-ai` 使用完全一致的环境变量名；迁移项目时无需修改）：
 
 | 提供商 | 环境变量 | 说明 |
 |--------|----------|------|
@@ -75,6 +91,20 @@ SDK 会自动从环境变量读取各提供商的凭证：
 | | `ANTHROPIC_BASE_URL` | （可选）自定义 API Base URL |
 | **Azure OpenAI** | `AZURE_OPENAI_API_KEY` | Azure API Key |
 | | `AZURE_OPENAI_ENDPOINT` | Azure 端点 URL |
+| **Amazon Bedrock** | `AWS_BEARER_TOKEN_BEDROCK` | 已签名的 Bedrock ConverseStream Bearer Token |
+| **Cerebras** | `CEREBRAS_API_KEY` | Cerebras API Key |
+| **Cloudflare** | `CLOUDFLARE_API_KEY` | （Cloudflare AI Gateway **和** Workers AI 共用） |
+| | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账号 ID（嵌入 URL path） |
+| | `CLOUDFLARE_GATEWAY_ID` | （仅 AI Gateway）网关实例 ID |
+| **DeepSeek** | `DEEPSEEK_API_KEY` | DeepSeek API Key |
+| **Google Gemini** | `GEMINI_API_KEY` | Google Generative AI API Key（aistudio.google.com） |
+| **Groq** | `GROQ_API_KEY` | Groq API Key（以 `gsk_` 开头） |
+| **Mistral** | `MISTRAL_API_KEY` | Mistral API Key（以 `trMZ` 开头） |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | NVIDIA NIM API Key（以 `nvapi-` 开头） |
+| **OpenRouter** | `OPENROUTER_API_KEY` | OpenRouter API Key |
+| **Vercel AI Gateway** | `AI_GATEWAY_API_KEY` | Vercel 颁发的 Key |
+| **xAI** | `XAI_API_KEY` | xAI（Grok）API Key |
+| **ZAI / Codin** | `ZAI_API_KEY` | ZAI API Key |
 
 也可以通过 `CredentialStore` trait 实现自定义凭证来源。
 
