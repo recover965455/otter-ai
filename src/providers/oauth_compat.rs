@@ -178,11 +178,9 @@ impl GenericOAuthAuth {
             }
         };
 
-        let token_url = self
-            .config
-            .token_url
-            .as_deref()
-            .ok_or_else(|| anyhow::anyhow!("No token URL configured for {}", self.config.display_name))?;
+        let token_url = self.config.token_url.as_deref().ok_or_else(|| {
+            anyhow::anyhow!("No token URL configured for {}", self.config.display_name)
+        })?;
         let response = reqwest::Client::new()
             .post(token_url)
             .header("Content-Type", "application/x-www-form-urlencoded")
@@ -208,10 +206,13 @@ impl GenericOAuthAuth {
             );
         }
 
-        let json: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| anyhow::anyhow!("Invalid token exchange response for {}: {}", self.config.display_name, e))?;
+        let json: serde_json::Value = response.json().await.map_err(|e| {
+            anyhow::anyhow!(
+                "Invalid token exchange response for {}: {}",
+                self.config.display_name,
+                e
+            )
+        })?;
         let access = json
             .get("access_token")
             .and_then(|v| v.as_str())
@@ -227,7 +228,10 @@ impl GenericOAuthAuth {
 
         let mut extra = std::collections::HashMap::new();
         if let Ok(account_id) = crate::providers::openai_responses::extract_account_id(access) {
-            extra.insert("account_id".to_string(), serde_json::Value::String(account_id));
+            extra.insert(
+                "account_id".to_string(),
+                serde_json::Value::String(account_id),
+            );
         }
 
         Ok(OAuthCredential {
@@ -238,7 +242,8 @@ impl GenericOAuthAuth {
                 extra,
             },
         })
-    }}
+    }
+}
 
 #[async_trait]
 impl OAuthAuth for GenericOAuthAuth {
@@ -325,13 +330,14 @@ impl OAuthAuth for GenericOAuthAuth {
         credential: &OAuthCredential,
         _signal: &CancellationToken,
     ) -> anyhow::Result<OAuthCredential> {
-        let token_url = self
-            .config
-            .token_url
-            .as_deref()
-            .ok_or_else(|| anyhow::anyhow!("No token URL configured for {}", self.config.display_name))?;
+        let token_url = self.config.token_url.as_deref().ok_or_else(|| {
+            anyhow::anyhow!("No token URL configured for {}", self.config.display_name)
+        })?;
         if credential.inner.refresh.is_empty() {
-            anyhow::bail!("No refresh token available for {}", self.config.display_name);
+            anyhow::bail!(
+                "No refresh token available for {}",
+                self.config.display_name
+            );
         }
 
         let client = reqwest::Client::new();
@@ -345,7 +351,9 @@ impl OAuthAuth for GenericOAuthAuth {
             ))
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("{} token refresh error: {}", self.config.display_name, e))?;
+            .map_err(|e| {
+                anyhow::anyhow!("{} token refresh error: {}", self.config.display_name, e)
+            })?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
@@ -358,10 +366,13 @@ impl OAuthAuth for GenericOAuthAuth {
             );
         }
 
-        let json: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| anyhow::anyhow!("Invalid token refresh response for {}: {}", self.config.display_name, e))?;
+        let json: serde_json::Value = response.json().await.map_err(|e| {
+            anyhow::anyhow!(
+                "Invalid token refresh response for {}: {}",
+                self.config.display_name,
+                e
+            )
+        })?;
         let access = json
             .get("access_token")
             .and_then(|v| v.as_str())
@@ -377,7 +388,10 @@ impl OAuthAuth for GenericOAuthAuth {
 
         let mut extra = credential.inner.extra.clone();
         if let Ok(account_id) = crate::providers::openai_responses::extract_account_id(access) {
-            extra.insert("account_id".to_string(), serde_json::Value::String(account_id));
+            extra.insert(
+                "account_id".to_string(),
+                serde_json::Value::String(account_id),
+            );
         }
 
         Ok(OAuthCredential {
@@ -497,10 +511,7 @@ fn parse_authorization_input(input: &str) -> (Option<String>, Option<String>) {
     let input = input.trim();
     if let Some(q) = input.find('?') {
         let params = parse_query(&input[q + 1..]);
-        return (
-            params.get("code").cloned(),
-            params.get("state").cloned(),
-        );
+        return (params.get("code").cloned(), params.get("state").cloned());
     }
     if let Some((code, state)) = input.split_once('#') {
         return (
@@ -535,7 +546,9 @@ struct LocalOAuthServer {
 }
 
 impl LocalOAuthServer {
-    async fn wait_for_code(&self) -> Result<Result<String, String>, tokio::sync::oneshot::error::RecvError> {
+    async fn wait_for_code(
+        &self,
+    ) -> Result<Result<String, String>, tokio::sync::oneshot::error::RecvError> {
         let rx = self.code_rx.lock().unwrap().take();
         match rx {
             Some(rx) => rx.await,
@@ -575,7 +588,9 @@ async fn write_html_response(
 /// as pi-ai's `startLocalOAuthServer` error path.
 async fn start_local_oauth_server(redirect_uri: &str, state: &str) -> Option<LocalOAuthServer> {
     let (host, port, path) = redirect_uri_parts(redirect_uri)?;
-    let listener = tokio::net::TcpListener::bind((host.as_str(), port)).await.ok()?;
+    let listener = tokio::net::TcpListener::bind((host.as_str(), port))
+        .await
+        .ok()?;
     let (code_tx, code_rx) = tokio::sync::oneshot::channel();
     let shutdown = CancellationToken::new();
     let shutdown_task = shutdown.clone();
@@ -625,21 +640,24 @@ async fn start_local_oauth_server(redirect_uri: &str, state: &str) -> Option<Loc
                     &mut stream,
                     404,
                     "Not Found",
-                    &oauth_page_html("Callback route not found.", "Open the exact URL shown in the login prompt."),
+                    &oauth_page_html(
+                        "Callback route not found.",
+                        "Open the exact URL shown in the login prompt.",
+                    ),
                 )
                 .await;
                 continue;
             }
-            let params = query
-                .as_deref()
-                .map(parse_query)
-                .unwrap_or_default();
+            let params = query.as_deref().map(parse_query).unwrap_or_default();
             if params.get("state").map(|s| s.as_str()) != Some(state.as_str()) {
                 write_html_response(
                     &mut stream,
                     400,
                     "Bad Request",
-                    &oauth_page_html("State mismatch.", "The OAuth state did not match; please retry the login."),
+                    &oauth_page_html(
+                        "State mismatch.",
+                        "The OAuth state did not match; please retry the login.",
+                    ),
                 )
                 .await;
                 continue;
@@ -649,7 +667,10 @@ async fn start_local_oauth_server(redirect_uri: &str, state: &str) -> Option<Loc
                     &mut stream,
                     400,
                     "Bad Request",
-                    &oauth_page_html("Missing authorization code.", "No authorization code was provided."),
+                    &oauth_page_html(
+                        "Missing authorization code.",
+                        "No authorization code was provided.",
+                    ),
                 )
                 .await;
                 continue;

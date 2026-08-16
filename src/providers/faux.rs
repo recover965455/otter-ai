@@ -50,7 +50,10 @@ fn default_usage() -> Usage {
 
 // ---------- public helper types/functions (TS: fauxText, fauxThinking, fauxToolCall, fauxAssistantMessage) ----------
 pub fn faux_text(text: impl Into<String>) -> ContentBlock {
-    ContentBlock::Text { text: text.into(), text_signature: None}
+    ContentBlock::Text {
+        text: text.into(),
+        text_signature: None,
+    }
 }
 
 pub fn faux_thinking(thinking: impl Into<String>) -> ContentBlock {
@@ -603,8 +606,8 @@ async fn stream_with_deltas(
                 {
                     content.push(ContentBlock::Text {
                         text: String::new(),
-                    text_signature: None,
-                });
+                        text_signature: None,
+                    });
                 }
                 stream.push(AssistantMessageEvent::TextStart);
                 for chunk in split_by_token_size(text, min_token_size, max_token_size) {
@@ -617,7 +620,9 @@ async fn stream_with_deltas(
                         ref mut content, ..
                     } = &mut partial
                     {
-                        if let Some(ContentBlock::Text { ref mut text, .. }) = content.get_mut(index) {
+                        if let Some(ContentBlock::Text { ref mut text, .. }) =
+                            content.get_mut(index)
+                        {
                             text.push_str(&chunk);
                         }
                     }

@@ -17,8 +17,8 @@ use otter_ai::providers::faux::{
 };
 use otter_ai::providers::{ModelsPublication, Provider, RefreshModelsContext};
 use otter_ai::types::{
-    AssistantMessageEvent, ContentBlock, Context, Message, Model, ModelCostRates, SimpleStreamOptions,
-    Tool, Usage,
+    AssistantMessageEvent, ContentBlock, Context, Message, Model, ModelCostRates,
+    SimpleStreamOptions, Tool, Usage,
 };
 
 fn user_context(text: &str) -> Context {
@@ -65,9 +65,7 @@ async fn put_credential(store: &InMemoryCredentialStore, provider_id: &str, cred
     store
         .modify_fn(
             provider_id,
-            Box::new(move |_| {
-                Box::pin(async move { Ok(Some(cred)) }) as ModifyFnOutput
-            }),
+            Box::new(move |_| Box::pin(async move { Ok(Some(cred)) }) as ModifyFnOutput),
             AuthOperationOptions::default(),
         )
         .await
@@ -101,7 +99,11 @@ async fn multi_turn_conversation_with_tool_call_backfill() {
         },
     ))]);
     let first = models
-        .complete(&model, user_context("Weather in Paris?"), SimpleStreamOptions::default())
+        .complete(
+            &model,
+            user_context("Weather in Paris?"),
+            SimpleStreamOptions::default(),
+        )
         .await
         .expect("first turn completes");
     assert_eq!(stop_reason_of(&first), "toolUse");
@@ -119,7 +121,10 @@ async fn multi_turn_conversation_with_tool_call_backfill() {
     ctx.messages.push(Message::ToolResult {
         tool_call_id,
         tool_name: "get_weather".to_string(),
-        content: vec![ContentBlock::Text { text: "22C, sunny".to_string(), text_signature: None}],
+        content: vec![ContentBlock::Text {
+            text: "22C, sunny".to_string(),
+            text_signature: None,
+        }],
         is_error: false,
         timestamp: 2,
     });
@@ -165,7 +170,14 @@ async fn streaming_emits_the_expected_event_sequence() {
     let types = event_types(&events);
     assert_eq!(
         types,
-        vec!["start", "text_start", "text_delta", "text_end", "usage", "done"]
+        vec![
+            "start",
+            "text_start",
+            "text_delta",
+            "text_end",
+            "usage",
+            "done"
+        ]
     );
     match &events[2] {
         AssistantMessageEvent::TextDelta { delta } => assert_eq!(delta, "abcdefghijkl"),
@@ -221,7 +233,10 @@ async fn resolves_credentials_from_the_store_and_honours_overrides() {
         .await
         .expect("override resolves");
     assert_eq!(overridden.auth.api_key.as_deref(), Some("sk-override"));
-    assert_eq!(overridden.auth.base_url.as_deref(), Some("https://example.test/v1"));
+    assert_eq!(
+        overridden.auth.base_url.as_deref(),
+        Some("https://example.test/v1")
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -241,7 +256,8 @@ impl Provider for CatalogProvider {
         "Catalog Test"
     }
     fn auth(&self) -> &otter_ai::auth::ProviderAuth {
-        static EMPTY: std::sync::OnceLock<otter_ai::auth::ProviderAuth> = std::sync::OnceLock::new();
+        static EMPTY: std::sync::OnceLock<otter_ai::auth::ProviderAuth> =
+            std::sync::OnceLock::new();
         EMPTY.get_or_init(|| otter_ai::auth::ProviderAuth {
             api_key: None,
             oauth: None,
@@ -471,7 +487,11 @@ async fn accounts_for_usage_and_cost_through_the_full_stack() {
     ))]);
 
     let msg = models
-        .complete(&model, user_context("hello there"), SimpleStreamOptions::default())
+        .complete(
+            &model,
+            user_context("hello there"),
+            SimpleStreamOptions::default(),
+        )
         .await
         .expect("completes");
 

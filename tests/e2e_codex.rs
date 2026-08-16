@@ -180,7 +180,8 @@ fn static_handler(resp: MockResponse) -> RequestHandler {
 async fn streams_sse_responses_into_event_stream_with_wire_headers() {
     let token = mock_token("acc_test");
     let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
-        "completed", None,
+        "completed",
+        None,
     ))))
     .await;
 
@@ -190,7 +191,12 @@ async fn streams_sse_responses_into_event_stream_with_wire_headers() {
         transport: CodexTransport::Sse,
         ..Default::default()
     };
-    let (events, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+    let (events, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Say hello"),
+        opts,
+    ))
+    .await;
 
     let types = event_types(&events);
     assert!(types.contains(&"text_delta"));
@@ -201,7 +207,10 @@ async fn streams_sse_responses_into_event_stream_with_wire_headers() {
     let req = &server.recorded()[0];
     assert_eq!(req.method, "POST");
     assert_eq!(req.path, "/codex/responses");
-    assert_eq!(req.header("authorization"), Some(format!("Bearer {}", token).as_str()));
+    assert_eq!(
+        req.header("authorization"),
+        Some(format!("Bearer {}", token).as_str())
+    );
     assert_eq!(req.header("chatgpt-account-id"), Some("acc_test"));
     assert_eq!(req.header("openai-beta"), Some("responses=experimental"));
     assert_eq!(req.header("accept"), Some("text/event-stream"));
@@ -234,10 +243,16 @@ async fn completes_after_response_completed_even_when_body_stays_open() {
         transport: CodexTransport::Sse,
         ..Default::default()
     };
-    let (events, msg) =
-        tokio::time::timeout(Duration::from_secs(5), collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)))
-            .await
-            .expect("completes without waiting for body close");
+    let (events, msg) = tokio::time::timeout(
+        Duration::from_secs(5),
+        collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        )),
+    )
+    .await
+    .expect("completes without waiting for body close");
 
     assert_eq!(text_of(&msg), "Hello");
     assert_eq!(stop_reason_of(&msg), "stop");
@@ -252,9 +267,10 @@ async fn completes_after_response_completed_even_when_body_stays_open() {
 #[tokio::test]
 async fn maps_response_incomplete_to_stop_reason_length() {
     let token = mock_token("acc_test");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("incomplete", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "incomplete",
+        None,
+    ))))
     .await;
 
     let opts = CodexStreamOptions {
@@ -263,7 +279,12 @@ async fn maps_response_incomplete_to_stop_reason_length() {
         transport: CodexTransport::Sse,
         ..Default::default()
     };
-    let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+    let (_, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Say hello"),
+        opts,
+    ))
+    .await;
 
     assert_eq!(text_of(&msg), "Hello");
     assert_eq!(stop_reason_of(&msg), "length");
@@ -282,7 +303,12 @@ async fn aborts_sse_fetch_after_the_configured_http_timeout() {
         timeout_ms: Some(50),
         ..Default::default()
     };
-    let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+    let (_, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Say hello"),
+        opts,
+    ))
+    .await;
 
     assert_eq!(stop_reason_of(&msg), "error");
     match &msg {
@@ -302,17 +328,21 @@ async fn aborts_sse_body_reads_after_response_headers_arrive() {
     let delta_one = common::sse_line(serde_json::json!({
         "type": "response.output_item.added",
         "item": { "type": "message", "id": "msg_1", "role": "assistant", "status": "in_progress", "content": [] },
-    })) + "\n\n" + &common::sse_line(serde_json::json!({
-        "type": "response.output_text.delta",
-        "delta": "one",
-    })) + "\n\n";
+    })) + "\n\n"
+        + &common::sse_line(serde_json::json!({
+            "type": "response.output_text.delta",
+            "delta": "one",
+        }))
+        + "\n\n";
     let delta_two_and_terminal = common::sse_line(serde_json::json!({
         "type": "response.output_text.delta",
         "delta": "two",
-    })) + "\n\n" + &common::sse_line(serde_json::json!({
-        "type": "response.completed",
-        "response": { "status": "completed" },
-    })) + "\n\n";
+    })) + "\n\n"
+        + &common::sse_line(serde_json::json!({
+            "type": "response.completed",
+            "response": { "status": "completed" },
+        }))
+        + "\n\n";
 
     let server = MockServer::spawn(Arc::new(move |_| {
         MockResponse::sse_stream(
@@ -344,7 +374,10 @@ async fn aborts_sse_body_reads_after_response_headers_arrive() {
                 saw_one = true;
                 signal.cancel();
             }
-            assert_ne!(delta, "two", "cancelled stream must not deliver later deltas");
+            assert_ne!(
+                delta, "two",
+                "cancelled stream must not deliver later deltas"
+            );
         }
     }
     let msg = result.await;
@@ -379,7 +412,12 @@ async fn sets_session_headers_and_prompt_cache_key_when_session_id_provided() {
         cache_retention: CacheRetention::Short,
         ..Default::default()
     };
-    let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+    let (_, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Say hello"),
+        opts,
+    ))
+    .await;
     assert_eq!(stop_reason_of(&msg), "stop");
 
     let reqs = captured.lock().unwrap().clone();
@@ -393,9 +431,10 @@ async fn sets_session_headers_and_prompt_cache_key_when_session_id_provided() {
 #[tokio::test]
 async fn omits_sse_cache_affinity_when_cache_retention_is_none() {
     let token = mock_token("acc_test");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
 
     let opts = CodexStreamOptions {
@@ -406,7 +445,12 @@ async fn omits_sse_cache_affinity_when_cache_retention_is_none() {
         cache_retention: CacheRetention::None,
         ..Default::default()
     };
-    let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+    let (_, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Say hello"),
+        opts,
+    ))
+    .await;
     assert_eq!(stop_reason_of(&msg), "stop");
 
     let req = &server.recorded()[0];
@@ -419,9 +463,10 @@ async fn omits_sse_cache_affinity_when_cache_retention_is_none() {
 #[tokio::test]
 async fn clamps_prompt_cache_key_and_session_headers_to_64_chars() {
     let token = mock_token("acc_test");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
 
     let long_session = "x".repeat(67);
@@ -433,7 +478,12 @@ async fn clamps_prompt_cache_key_and_session_headers_to_64_chars() {
         cache_retention: CacheRetention::Short,
         ..Default::default()
     };
-    let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+    let (_, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Say hello"),
+        opts,
+    ))
+    .await;
     assert_eq!(stop_reason_of(&msg), "stop");
 
     let clamped = "x".repeat(64);
@@ -447,9 +497,10 @@ async fn clamps_prompt_cache_key_and_session_headers_to_64_chars() {
 #[tokio::test]
 async fn does_not_set_session_headers_when_session_id_missing() {
     let token = mock_token("acc_test");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
 
     let opts = CodexStreamOptions {
@@ -458,7 +509,12 @@ async fn does_not_set_session_headers_when_session_id_missing() {
         transport: CodexTransport::Sse,
         ..Default::default()
     };
-    let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+    let (_, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Say hello"),
+        opts,
+    ))
+    .await;
     assert_eq!(stop_reason_of(&msg), "stop");
 
     let req = &server.recorded()[0];
@@ -475,9 +531,10 @@ async fn does_not_set_session_headers_when_session_id_missing() {
 #[tokio::test]
 async fn sends_the_expected_codex_request_body_shape() {
     let token = mock_token("acc_test");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
 
     let mut context = user_context("Use a tool");
@@ -502,7 +559,10 @@ async fn sends_the_expected_codex_request_body_shape() {
     assert_eq!(body["store"], false);
     assert_eq!(body["stream"], true);
     assert_eq!(body["instructions"], "You are a helpful assistant.");
-    assert_eq!(body["include"], serde_json::json!(["reasoning.encrypted_content"]));
+    assert_eq!(
+        body["include"],
+        serde_json::json!(["reasoning.encrypted_content"])
+    );
     assert_eq!(body["parallel_tool_calls"], true);
     assert_eq!(body["tool_choice"], "auto");
     assert_eq!(body["text"]["verbosity"], "low");
@@ -533,12 +593,16 @@ fn build_request_body_supports_system_prompt_override_and_custom_instructions() 
 #[tokio::test]
 async fn preserves_xhigh_reasoning_effort_through_the_level_map() {
     let token = mock_token("acc_test");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
 
-    let model = codex_model_with_map("gpt-5.5", Some(level_map(&[("xhigh", "xhigh"), ("minimal", "low")])));
+    let model = codex_model_with_map(
+        "gpt-5.5",
+        Some(level_map(&[("xhigh", "xhigh"), ("minimal", "low")])),
+    );
     let opts = CodexStreamOptions {
         api_key: token,
         base_url: Some(server.url()),
@@ -559,9 +623,10 @@ async fn preserves_xhigh_reasoning_effort_through_the_level_map() {
 #[tokio::test]
 async fn clamps_minimal_reasoning_effort_to_low() {
     let token = mock_token("acc_test");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
 
     for model_id in ["gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.5"] {
@@ -586,9 +651,10 @@ async fn clamps_minimal_reasoning_effort_to_low() {
 #[tokio::test]
 async fn forwards_required_tool_choice() {
     let token = mock_token("acc_test");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
 
     let opts = CodexStreamOptions {
@@ -702,10 +768,16 @@ async fn uses_retry_after_ms_for_sse_retries() {
         max_retries: Some(1),
         ..Default::default()
     };
-    let (_, msg) =
-        tokio::time::timeout(Duration::from_secs(5), collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)))
-            .await
-            .expect("retry succeeds");
+    let (_, msg) = tokio::time::timeout(
+        Duration::from_secs(5),
+        collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        )),
+    )
+    .await
+    .expect("retry succeeds");
     assert_eq!(text_of(&msg), "Hello");
     assert_eq!(server.request_count(), 2);
     server.shutdown();
@@ -734,10 +806,16 @@ async fn uses_retry_after_seconds_for_sse_retries() {
         max_retries: Some(1),
         ..Default::default()
     };
-    let (_, msg) =
-        tokio::time::timeout(Duration::from_secs(5), collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)))
-            .await
-            .expect("retry succeeds");
+    let (_, msg) = tokio::time::timeout(
+        Duration::from_secs(5),
+        collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        )),
+    )
+    .await
+    .expect("retry succeeds");
     assert_eq!(text_of(&msg), "Hello");
     assert_eq!(server.request_count(), 2);
     server.shutdown();
@@ -762,7 +840,12 @@ async fn fails_immediately_when_retry_delay_exceeds_the_limit() {
             max_retry_delay_ms: Some(1000),
             ..Default::default()
         };
-        let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+        let (_, msg) = collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        ))
+        .await;
         assert_eq!(stop_reason_of(&msg), "error", "status {}", status);
         match &msg {
             Message::Assistant {
@@ -800,10 +883,16 @@ async fn uses_exponential_backoff_across_repeated_retries() {
         ..Default::default()
     };
     // Backoff delays: 1s + 2s = 3s total.
-    let (_, msg) =
-        tokio::time::timeout(Duration::from_secs(15), collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)))
-            .await
-            .expect("eventual success after backoff");
+    let (_, msg) = tokio::time::timeout(
+        Duration::from_secs(15),
+        collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        )),
+    )
+    .await
+    .expect("eventual success after backoff");
     assert_eq!(text_of(&msg), "Hello");
     assert_eq!(server.request_count(), 3);
     server.shutdown();
@@ -831,7 +920,12 @@ async fn does_not_retry_terminal_usage_limit_errors() {
         max_retries: Some(3),
         ..Default::default()
     };
-    let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+    let (_, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Say hello"),
+        opts,
+    ))
+    .await;
     assert_eq!(stop_reason_of(&msg), "error");
     match &msg {
         Message::Assistant {
@@ -844,7 +938,11 @@ async fn does_not_retry_terminal_usage_limit_errors() {
         ),
         _ => panic!("expected error message"),
     }
-    assert_eq!(server.request_count(), 1, "terminal rate limits are not retried");
+    assert_eq!(
+        server.request_count(),
+        1,
+        "terminal rate limits are not retried"
+    );
     server.shutdown();
 }
 
@@ -865,7 +963,12 @@ async fn surfaces_unauthorized_error_bodies() {
         transport: CodexTransport::Sse,
         ..Default::default()
     };
-    let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+    let (_, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Say hello"),
+        opts,
+    ))
+    .await;
     assert_eq!(stop_reason_of(&msg), "error");
     match &msg {
         Message::Assistant {
@@ -880,13 +983,11 @@ async fn surfaces_unauthorized_error_bodies() {
 #[tokio::test]
 async fn maps_stream_error_events_to_errors() {
     let token = mock_token("acc_test");
-    let events = vec![
-        common::sse_line(serde_json::json!({
-            "type": "error",
-            "code": "server_error",
-            "message": "boom",
-        })),
-    ];
+    let events = vec![common::sse_line(serde_json::json!({
+        "type": "error",
+        "code": "server_error",
+        "message": "boom",
+    }))];
     let server = MockServer::spawn(static_handler(MockResponse::sse(events))).await;
 
     let opts = CodexStreamOptions {
@@ -895,7 +996,12 @@ async fn maps_stream_error_events_to_errors() {
         transport: CodexTransport::Sse,
         ..Default::default()
     };
-    let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+    let (_, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Say hello"),
+        opts,
+    ))
+    .await;
     assert_eq!(stop_reason_of(&msg), "error");
     match &msg {
         Message::Assistant {
@@ -922,7 +1028,12 @@ async fn maps_response_failed_events_to_errors() {
         transport: CodexTransport::Sse,
         ..Default::default()
     };
-    let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts)).await;
+    let (_, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Say hello"),
+        opts,
+    ))
+    .await;
     assert_eq!(stop_reason_of(&msg), "error");
     match &msg {
         Message::Assistant {
@@ -978,7 +1089,12 @@ async fn streams_tool_calls_and_maps_tool_use_stop_reason() {
         transport: CodexTransport::Sse,
         ..Default::default()
     };
-    let (events, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Weather in Paris?"), opts)).await;
+    let (events, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("Weather in Paris?"),
+        opts,
+    ))
+    .await;
 
     let types = event_types(&events);
     assert!(types.contains(&"toolcall_start"));
@@ -1052,7 +1168,8 @@ async fn streams_thinking_with_encrypted_signature_for_replay() {
         ..Default::default()
     };
     let context = user_context("Think then answer");
-    let (events, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), context.clone(), opts)).await;
+    let (events, msg) =
+        collect_events(stream_codex(&codex_model("gpt-5.4"), context.clone(), opts)).await;
 
     let types = event_types(&events);
     assert!(types.contains(&"thinking_start"));
@@ -1062,7 +1179,10 @@ async fn streams_thinking_with_encrypted_signature_for_replay() {
     match &msg {
         Message::Assistant { content, .. } => {
             match &content[0] {
-                ContentBlock::Thinking { thinking, signature } => {
+                ContentBlock::Thinking {
+                    thinking,
+                    signature,
+                } => {
                     assert_eq!(thinking, "thinking hard");
                     let sig = signature.as_deref().expect("signature present");
                     assert!(sig.contains("ENC"), "signature carries encrypted_content");
@@ -1083,9 +1203,10 @@ async fn streams_thinking_with_encrypted_signature_for_replay() {
 
     // Multi-turn replay: the thinking signature must be sent as a reasoning
     // item, assistant text as a message item.
-    let server2 = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server2 = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
     let mut ctx2 = context;
     ctx2.messages.push(msg);
@@ -1098,7 +1219,10 @@ async fn streams_thinking_with_encrypted_signature_for_replay() {
     };
     let (_, msg2) = collect_events(stream_codex(&codex_model("gpt-5.4"), ctx2, opts2)).await;
     assert_eq!(stop_reason_of(&msg2), "stop");
-    let input = server2.recorded()[0].json_body()["input"].as_array().unwrap().clone();
+    let input = server2.recorded()[0].json_body()["input"]
+        .as_array()
+        .unwrap()
+        .clone();
     // [user, reasoning(replayed signature), assistant message, user]
     assert_eq!(input[1]["type"], "reasoning");
     assert_eq!(input[1]["encrypted_content"], "ENC");
@@ -1111,33 +1235,43 @@ async fn streams_thinking_with_encrypted_signature_for_replay() {
 #[tokio::test]
 async fn replays_multi_turn_history_with_tool_calls_and_results() {
     let token = mock_token("acc_test");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
 
-    let assistant = Message::assistant_default("openai-codex-responses".into(), "chatgpt-plus".into())
-        .with_content(vec![
-            ContentBlock::Text { text: "Let me check.".into(), text_signature: None},
-            ContentBlock::ToolCall {
-                id: "call_1|fc_1".into(),
-                name: "sample_tool".into(),
-                arguments: serde_json::json!({ "payload": "x" }),
-            },
-        ])
-        .with_model(Some("gpt-5.4".into()))
-        .with_stop_reason(Some("toolUse".into()));
+    let assistant =
+        Message::assistant_default("openai-codex-responses".into(), "chatgpt-plus".into())
+            .with_content(vec![
+                ContentBlock::Text {
+                    text: "Let me check.".into(),
+                    text_signature: None,
+                },
+                ContentBlock::ToolCall {
+                    id: "call_1|fc_1".into(),
+                    name: "sample_tool".into(),
+                    arguments: serde_json::json!({ "payload": "x" }),
+                },
+            ])
+            .with_model(Some("gpt-5.4".into()))
+            .with_stop_reason(Some("toolUse".into()));
     let tool_result = Message::ToolResult {
         tool_call_id: "call_1|fc_1".into(),
         tool_name: "sample_tool".into(),
-        content: vec![ContentBlock::Text { text: "real result".into(), text_signature: None}],
+        content: vec![ContentBlock::Text {
+            text: "real result".into(),
+            text_signature: None,
+        }],
         is_error: false,
         timestamp: 2,
     };
     let mut context = user_context("Use the tool");
     context.messages.push(assistant);
     context.messages.push(tool_result);
-    context.messages.push(Message::user_from_string("Now finish"));
+    context
+        .messages
+        .push(Message::user_from_string("Now finish"));
 
     let opts = CodexStreamOptions {
         api_key: token,
@@ -1148,7 +1282,10 @@ async fn replays_multi_turn_history_with_tool_calls_and_results() {
     let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), context, opts)).await;
     assert_eq!(stop_reason_of(&msg), "stop");
 
-    let input = server.recorded()[0].json_body()["input"].as_array().unwrap().clone();
+    let input = server.recorded()[0].json_body()["input"]
+        .as_array()
+        .unwrap()
+        .clone();
     assert_eq!(
         input[0],
         serde_json::json!({ "role": "user", "content": [{ "type": "input_text", "text": "Use the tool" }] })
@@ -1160,7 +1297,10 @@ async fn replays_multi_turn_history_with_tool_calls_and_results() {
     assert_eq!(input[2]["call_id"], "call_1");
     assert_eq!(input[2]["id"], "fc_1");
     assert_eq!(input[2]["name"], "sample_tool");
-    assert_eq!(input[2]["arguments"], serde_json::json!("{\"payload\":\"x\"}"));
+    assert_eq!(
+        input[2]["arguments"],
+        serde_json::json!("{\"payload\":\"x\"}")
+    );
     assert_eq!(
         input[3],
         serde_json::json!({ "type": "function_call_output", "call_id": "call_1", "output": "real result" })
@@ -1226,7 +1366,10 @@ async fn maps_usage_details_into_cache_and_reasoning_buckets() {
     assert!((usage.cost.cache_write - expected_cache_write).abs() < 1e-9);
     assert!(
         (usage.cost.total
-            - (expected_input_cost + expected_output_cost + expected_cache_read + expected_cache_write))
+            - (expected_input_cost
+                + expected_output_cost
+                + expected_cache_read
+                + expected_cache_write))
             .abs()
             < 1e-9
     );
@@ -1293,9 +1436,7 @@ async fn put_credential(store: &InMemoryCredentialStore, provider_id: &str, cred
     store
         .modify_fn(
             provider_id,
-            Box::new(move |_| {
-                Box::pin(async move { Ok(Some(cred)) }) as ModifyFnOutput
-            }),
+            Box::new(move |_| Box::pin(async move { Ok(Some(cred)) }) as ModifyFnOutput),
             AuthOperationOptions::default(),
         )
         .await
@@ -1315,7 +1456,10 @@ async fn refreshes_expired_tokens_through_the_token_endpoint() {
     let server = MockServer::spawn(Arc::new(move |req| {
         assert_eq!(req.path, "/oauth/token");
         let form = req.form_body();
-        assert_eq!(form.get("grant_type").map(String::as_str), Some("refresh_token"));
+        assert_eq!(
+            form.get("grant_type").map(String::as_str),
+            Some("refresh_token")
+        );
         assert_eq!(
             form.get("client_id").map(String::as_str),
             Some("app_EMoamEEZ73f0CkXaXp7hrann")
@@ -1342,7 +1486,10 @@ async fn refreshes_expired_tokens_through_the_token_endpoint() {
 
     let before = chrono::Utc::now().timestamp_millis();
     let refreshed = auth
-        .refresh(&expired_oauth_credential(), &otter_ai::CancellationToken::new())
+        .refresh(
+            &expired_oauth_credential(),
+            &otter_ai::CancellationToken::new(),
+        )
         .await
         .expect("refresh succeeds");
     let after = chrono::Utc::now().timestamp_millis();
@@ -1352,7 +1499,11 @@ async fn refreshes_expired_tokens_through_the_token_endpoint() {
     assert!(refreshed.inner.expires >= before + 3600 * 1000);
     assert!(refreshed.inner.expires <= after + 3600 * 1000);
     assert_eq!(
-        refreshed.inner.extra.get("account_id").and_then(|v| v.as_str()),
+        refreshed
+            .inner
+            .extra
+            .get("account_id")
+            .and_then(|v| v.as_str()),
         Some("acc_new")
     );
     server.shutdown();
@@ -1377,7 +1528,10 @@ async fn refresh_failures_include_the_response_body() {
     )));
 
     let err = auth
-        .refresh(&expired_oauth_credential(), &otter_ai::CancellationToken::new())
+        .refresh(
+            &expired_oauth_credential(),
+            &otter_ai::CancellationToken::new(),
+        )
         .await
         .expect_err("refresh must fail");
     assert!(err.to_string().contains("failed (401)"), "err: {}", err);
@@ -1439,10 +1593,13 @@ async fn resolve_provider_auth_refreshes_and_persists_expired_credentials() {
             assert_eq!(stored.inner.refresh, "refresh-token-2");
             assert!(stored.inner.expires > chrono::Utc::now().timestamp_millis());
         }
-        other => panic!("expected persisted oauth credential, got {:?}", other.map(|c| match c {
-            Credential::OAuth(_) => "oauth",
-            Credential::ApiKey(_) => "api_key",
-        })),
+        other => panic!(
+            "expected persisted oauth credential, got {:?}",
+            other.map(|c| match c {
+                Credential::OAuth(_) => "oauth",
+                Credential::ApiKey(_) => "api_key",
+            })
+        ),
     }
     server.shutdown();
 }
@@ -1455,9 +1612,10 @@ async fn resolve_provider_auth_refreshes_and_persists_expired_credentials() {
 #[tokio::test]
 async fn models_stream_merges_auth_and_routes_through_the_codex_adapter() {
     let token = mock_token("acc_full");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
 
     let provider = build_oauth_provider(test_spec(
@@ -1499,7 +1657,10 @@ async fn models_stream_merges_auth_and_routes_through_the_codex_adapter() {
         .find(|r| r.method == "POST")
         .expect("SSE POST recorded");
     assert_eq!(req.path, "/codex/responses");
-    assert_eq!(req.header("authorization"), Some(format!("Bearer {}", token).as_str()));
+    assert_eq!(
+        req.header("authorization"),
+        Some(format!("Bearer {}", token).as_str())
+    );
     assert_eq!(req.header("chatgpt-account-id"), Some("acc_full"));
     server.shutdown();
 }
@@ -1507,9 +1668,10 @@ async fn models_stream_merges_auth_and_routes_through_the_codex_adapter() {
 #[tokio::test]
 async fn models_stream_forwards_session_cache_options_to_codex() {
     let token = mock_token("acc_session");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
 
     let provider = build_oauth_provider(test_spec(
@@ -1521,7 +1683,7 @@ async fn models_stream_forwards_session_cache_options_to_codex() {
         &store,
         "chatgpt-plus",
         Credential::OAuth(otter_ai::auth::OAuthCredential {
-                inner: otter_ai::auth::OAuthCredentials {
+            inner: otter_ai::auth::OAuthCredentials {
                 access: token,
                 refresh: "r".to_string(),
                 expires: chrono::Utc::now().timestamp_millis() + 3_600_000,
@@ -1555,10 +1717,7 @@ async fn models_stream_forwards_session_cache_options_to_codex() {
         .find(|r| r.method == "POST")
         .expect("SSE POST recorded");
     assert_eq!(req.header("session-id"), Some("session-full-stack"));
-    assert_eq!(
-        req.json_body()["prompt_cache_key"],
-        "session-full-stack"
-    );
+    assert_eq!(req.json_body()["prompt_cache_key"], "session-full-stack");
     server.shutdown();
 }
 
@@ -1569,9 +1728,10 @@ async fn models_stream_forwards_session_cache_options_to_codex() {
 #[tokio::test]
 async fn on_payload_hook_observes_the_request_body() {
     let token = mock_token("acc_test");
-    let server = MockServer::spawn(static_handler(MockResponse::sse(
-        basic_completion_events("completed", None),
-    )))
+    let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+        "completed",
+        None,
+    ))))
     .await;
 
     let seen = Arc::new(Mutex::new(Vec::<serde_json::Value>::new()));
@@ -1587,7 +1747,12 @@ async fn on_payload_hook_observes_the_request_body() {
         })),
         ..Default::default()
     };
-    let (_, msg) = collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("hi"), opts)).await;
+    let (_, msg) = collect_events(stream_codex(
+        &codex_model("gpt-5.4"),
+        user_context("hi"),
+        opts,
+    ))
+    .await;
     assert_eq!(stop_reason_of(&msg), "stop");
 
     let seen = seen.lock().unwrap();
@@ -1663,9 +1828,12 @@ mod websocket_transport {
             cache_retention: CacheRetention::Short,
             ..Default::default()
         };
-        let (events, msg) =
-            collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts))
-                .await;
+        let (events, msg) = collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        ))
+        .await;
 
         let types = event_types(&events);
         assert_eq!(types.iter().filter(|t| **t == "start").count(), 1);
@@ -1680,7 +1848,10 @@ mod websocket_transport {
 
         let req: WsRecordedRequest = server.recorded()[0].clone();
         assert_eq!(req.path, ws_request_line());
-        assert_eq!(req.header("authorization"), Some(format!("Bearer {}", token).as_str()));
+        assert_eq!(
+            req.header("authorization"),
+            Some(format!("Bearer {}", token).as_str())
+        );
         assert_eq!(req.header("chatgpt-account-id"), Some("acc_ws"));
         assert_eq!(
             req.header("openai-beta"),
@@ -1696,9 +1867,10 @@ mod websocket_transport {
     async fn zstd_compresses_sse_request_bodies() {
         use otter_ai::providers::openai_responses::CodexStreamOptions;
         let token = mock_token("acc_zstd");
-        let server = MockServer::spawn(static_handler(MockResponse::sse(
-            basic_completion_events("completed", None),
-        )))
+        let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+            "completed",
+            None,
+        ))))
         .await;
 
         let large_text = "compress me ".repeat(400);
@@ -1732,7 +1904,10 @@ mod websocket_transport {
                 serde_json::json!(large_text)
             );
         }
-        assert_eq!(req.json_body()["input"][0]["content"][0]["text"], large_text);
+        assert_eq!(
+            req.json_body()["input"][0]["content"][0]["text"],
+            large_text
+        );
         server.shutdown();
     }
 
@@ -1741,9 +1916,10 @@ mod websocket_transport {
         let token = mock_token("acc_fallback");
         // Plain HTTP server: the WS upgrade handshake will fail (no 101),
         // so `auto` must retry the same request over SSE.
-        let server = MockServer::spawn(static_handler(MockResponse::sse(
-            basic_completion_events("completed", None),
-        )))
+        let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+            "completed",
+            None,
+        ))))
         .await;
 
         let opts = CodexStreamOptions {
@@ -1752,24 +1928,31 @@ mod websocket_transport {
             transport: CodexTransport::Auto,
             ..Default::default()
         };
-        let (_, msg) =
-            collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts))
-                .await;
+        let (_, msg) = collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        ))
+        .await;
         assert_eq!(text_of(&msg), "Hello");
         assert_eq!(stop_reason_of(&msg), "stop");
 
         // The failed WS handshake (GET) plus the successful SSE POST.
         let recorded = server.recorded();
-        assert!(recorded.iter().any(|r| r.method == "POST"), "SSE POST recorded");
+        assert!(
+            recorded.iter().any(|r| r.method == "POST"),
+            "SSE POST recorded"
+        );
         server.shutdown();
     }
 
     #[tokio::test]
     async fn explicit_websocket_transport_falls_back_to_sse_when_connect_fails() {
         let token = mock_token("acc_ws_fail");
-        let server = MockServer::spawn(static_handler(MockResponse::sse(
-            basic_completion_events("completed", None),
-        )))
+        let server = MockServer::spawn(static_handler(MockResponse::sse(basic_completion_events(
+            "completed",
+            None,
+        ))))
         .await;
 
         let opts = CodexStreamOptions {
@@ -1778,9 +1961,12 @@ mod websocket_transport {
             transport: CodexTransport::Websocket,
             ..Default::default()
         };
-        let (_, msg) =
-            collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts))
-                .await;
+        let (_, msg) = collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        ))
+        .await;
         assert_eq!(stop_reason_of(&msg), "stop");
         assert_eq!(text_of(&msg), "Hello");
         server.shutdown();
@@ -1853,18 +2039,34 @@ mod websocket_transport {
             transport: CodexTransport::Auto,
             ..Default::default()
         };
-        let (events, msg) =
-            collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts))
-                .await;
+        let (events, msg) = collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        ))
+        .await;
 
         assert_eq!(stop_reason_of(&msg), "stop");
         match &msg {
             Message::Assistant { end_turn, .. } => assert_eq!(end_turn, &Some(false)),
             _ => panic!("expected assistant message"),
         }
-        assert_eq!(event_types(&events).iter().filter(|t| **t == "start").count(), 1);
-        let headers = headers_seen.lock().unwrap().clone().expect("ws headers captured");
-        assert_eq!(headers.get("session-id").map(|s| s.as_str()), Some("session-auto"));
+        assert_eq!(
+            event_types(&events)
+                .iter()
+                .filter(|t| **t == "start")
+                .count(),
+            1
+        );
+        let headers = headers_seen
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("ws headers captured");
+        assert_eq!(
+            headers.get("session-id").map(|s| s.as_str()),
+            Some("session-auto")
+        );
         assert!(!headers.contains_key("session_id"));
         assert_eq!(
             headers.get("x-client-request-id").map(|s| s.as_str()),
@@ -1926,7 +2128,11 @@ mod websocket_transport {
         let headers = connected_headers.lock().unwrap();
         let accounts: Vec<&str> = headers
             .iter()
-            .map(|h| h.get("chatgpt-account-id").map(|s| s.as_str()).unwrap_or(""))
+            .map(|h| {
+                h.get("chatgpt-account-id")
+                    .map(|s| s.as_str())
+                    .unwrap_or("")
+            })
             .collect();
         assert_eq!(accounts, vec!["account-a", "account-b"]);
         assert_eq!(
@@ -1937,8 +2143,9 @@ mod websocket_transport {
             headers[1].get("authorization"),
             Some(&format!("Bearer {}", mock_token("account-b")))
         );
-        let stats = otter_ai::providers::openai_responses::get_codex_ws_debug_stats("shared-session")
-            .expect("stats");
+        let stats =
+            otter_ai::providers::openai_responses::get_codex_ws_debug_stats("shared-session")
+                .expect("stats");
         assert_eq!(stats.connections_created, 2);
         assert_eq!(stats.connections_reused, 1);
         assert_eq!(stats.requests, 3);
@@ -1967,17 +2174,34 @@ mod websocket_transport {
             transport: CodexTransport::Auto,
             ..Default::default()
         };
-        collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("one"), opts.clone())).await;
-        collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("two"), opts)).await;
+        collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("one"),
+            opts.clone(),
+        ))
+        .await;
+        collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("two"),
+            opts,
+        ))
+        .await;
 
         let requests = server.recorded();
         assert_eq!(requests.len(), 2);
         assert_eq!(requests[0].connection, 1);
-        assert_eq!(requests[1].connection, 2, "one-shot connections are not reused");
+        assert_eq!(
+            requests[1].connection, 2,
+            "one-shot connections are not reused"
+        );
         for req in &requests {
             assert!(req.frame.get("prompt_cache_key").is_none());
         }
-        assert!(collected.lock().unwrap().iter().all(|f| f.get("prompt_cache_key").is_none()));
+        assert!(collected
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|f| f.get("prompt_cache_key").is_none()));
         assert!(
             otter_ai::providers::openai_responses::get_codex_ws_debug_stats("one-off-summary")
                 .is_none(),
@@ -1989,17 +2213,18 @@ mod websocket_transport {
     #[tokio::test]
     async fn falls_back_to_sse_when_websocket_connect_times_out() {
         otter_ai::providers::openai_responses::close_codex_ws_sessions(Some("ws-connect-timeout"));
-        otter_ai::providers::openai_responses::reset_codex_ws_debug_stats(Some("ws-connect-timeout"));
+        otter_ai::providers::openai_responses::reset_codex_ws_debug_stats(Some(
+            "ws-connect-timeout",
+        ));
         let token = mock_token("acc_conn_timeout");
         // Combined server: WS upgrades hang (connect timeout), HTTP is SSE.
-        let server = WsMockServer::spawn_combined_pending_handshake(Arc::new(
-            |req: &RecordedRequest| {
+        let server =
+            WsMockServer::spawn_combined_pending_handshake(Arc::new(|req: &RecordedRequest| {
                 assert_eq!(req.method, "POST");
                 assert_eq!(req.path, "/codex/responses");
                 MockResponse::sse(basic_completion_events("completed", None))
-            },
-        ))
-        .await;
+            }))
+            .await;
 
         let opts = CodexStreamOptions {
             api_key: token,
@@ -2010,15 +2235,25 @@ mod websocket_transport {
             websocket_connect_timeout_ms: Some(50),
             ..Default::default()
         };
-        let (_, msg) =
-            collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts))
-                .await;
-        eprintln!("CONNECT_TIMEOUT_TEST err={:?}", match &msg { otter_ai::Message::Assistant { error_message, .. } => error_message, _ => &None });
+        let (_, msg) = collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        ))
+        .await;
+        eprintln!(
+            "CONNECT_TIMEOUT_TEST err={:?}",
+            match &msg {
+                otter_ai::Message::Assistant { error_message, .. } => error_message,
+                _ => &None,
+            }
+        );
         assert_eq!(stop_reason_of(&msg), "stop");
         assert_eq!(text_of(&msg), "Hello");
         assert_eq!(server.recorded_http().len(), 1, "SSE fallback happened");
-        let stats = otter_ai::providers::openai_responses::get_codex_ws_debug_stats("ws-connect-timeout")
-            .expect("stats");
+        let stats =
+            otter_ai::providers::openai_responses::get_codex_ws_debug_stats("ws-connect-timeout")
+                .expect("stats");
         assert_eq!(stats.websocket_failures, 1);
         assert_eq!(stats.sse_fallbacks, 1);
         assert_eq!(stats.websocket_fallback_active, Some(true));
@@ -2055,20 +2290,37 @@ mod websocket_transport {
             transport: CodexTransport::Auto,
             ..Default::default()
         };
-        let (_, msg) =
-            collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts))
-                .await;
-        eprintln!("CONN_LIMIT err={:?}", match &msg { otter_ai::Message::Assistant { error_message, .. } => error_message, _ => &None });
+        let (_, msg) = collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        ))
+        .await;
+        eprintln!(
+            "CONN_LIMIT err={:?}",
+            match &msg {
+                otter_ai::Message::Assistant { error_message, .. } => error_message,
+                _ => &None,
+            }
+        );
         assert_eq!(stop_reason_of(&msg), "stop");
         assert_eq!(text_of(&msg), "Recovered");
-        assert_eq!(*count.lock().unwrap(), 2, "reconnected once on a fresh connection");
+        assert_eq!(
+            *count.lock().unwrap(),
+            2,
+            "reconnected once on a fresh connection"
+        );
         server.shutdown();
     }
 
     #[tokio::test]
     async fn falls_back_to_sse_when_websocket_idle_before_first_event() {
-        otter_ai::providers::openai_responses::close_codex_ws_sessions(Some("ws-idle-before-start"));
-        otter_ai::providers::openai_responses::reset_codex_ws_debug_stats(Some("ws-idle-before-start"));
+        otter_ai::providers::openai_responses::close_codex_ws_sessions(Some(
+            "ws-idle-before-start",
+        ));
+        otter_ai::providers::openai_responses::reset_codex_ws_debug_stats(Some(
+            "ws-idle-before-start",
+        ));
         let token = mock_token("acc_idle_before");
         // Combined server: WS handshake completes, frame arrives, no reply
         // (Hang) → client idles for timeout_ms → SSE fallback on the same URL.
@@ -2090,14 +2342,18 @@ mod websocket_transport {
             timeout_ms: Some(50),
             ..Default::default()
         };
-        let (_, msg) =
-            collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts))
-                .await;
+        let (_, msg) = collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        ))
+        .await;
         assert_eq!(stop_reason_of(&msg), "stop");
         assert_eq!(text_of(&msg), "Hello");
         assert_eq!(server.recorded_http().len(), 1, "SSE fallback happened");
-        let stats = otter_ai::providers::openai_responses::get_codex_ws_debug_stats("ws-idle-before-start")
-            .expect("stats");
+        let stats =
+            otter_ai::providers::openai_responses::get_codex_ws_debug_stats("ws-idle-before-start")
+                .expect("stats");
         assert_eq!(stats.websocket_failures, 1);
         assert_eq!(stats.sse_fallbacks, 1);
         assert_eq!(stats.websocket_fallback_active, Some(true));
@@ -2128,9 +2384,12 @@ mod websocket_transport {
             timeout_ms: Some(50),
             ..Default::default()
         };
-        let (events, msg) =
-            collect_events(stream_codex(&codex_model("gpt-5.4"), user_context("Say hello"), opts))
-                .await;
+        let (events, msg) = collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            user_context("Say hello"),
+            opts,
+        ))
+        .await;
         assert_eq!(stop_reason_of(&msg), "error");
         assert_eq!(
             match &msg {
@@ -2200,9 +2459,14 @@ mod websocket_transport {
         .await;
 
         let conns = conns.lock().unwrap();
-        assert_eq!(conns.as_slice(), &[1, 2], "age-limited connection is replaced");
-        let stats = otter_ai::providers::openai_responses::get_codex_ws_debug_stats("aged-ws-session")
-            .expect("stats");
+        assert_eq!(
+            conns.as_slice(),
+            &[1, 2],
+            "age-limited connection is replaced"
+        );
+        let stats =
+            otter_ai::providers::openai_responses::get_codex_ws_debug_stats("aged-ws-session")
+                .expect("stats");
         assert_eq!(stats.connections_created, 2);
         assert_eq!(stats.connections_reused, 0);
         server.shutdown();
@@ -2279,13 +2543,21 @@ mod websocket_transport {
             transport: CodexTransport::WebsocketCached,
             ..Default::default()
         };
-        let (_, first) = collect_events(stream_codex(&codex_model("gpt-5.4"), ctx.clone(), opts.clone())).await;
+        let (_, first) = collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            ctx.clone(),
+            opts.clone(),
+        ))
+        .await;
         // Assistant tool call + tool result + follow-up user message.
         append_message(&mut ctx, first);
         ctx.messages.push(Message::ToolResult {
             tool_call_id: "call_1|ctc_1".to_string(),
             tool_name: "sample_tool".to_string(),
-            content: vec![ContentBlock::Text { text: "real result".to_string(), text_signature: None }],
+            content: vec![ContentBlock::Text {
+                text: "real result".to_string(),
+                text_signature: None,
+            }],
             is_error: false,
             timestamp: 0,
         });
@@ -2341,7 +2613,8 @@ mod websocket_transport {
         let session = format!("missing-continuation-{}", recovery_transport);
         otter_ai::providers::openai_responses::close_codex_ws_sessions(Some(&session));
         otter_ai::providers::openai_responses::reset_codex_ws_debug_stats(Some(&session));
-        let sent_bodies: Arc<Mutex<Vec<(usize, serde_json::Value)>>> = Arc::new(Mutex::new(Vec::new()));
+        let sent_bodies: Arc<Mutex<Vec<(usize, serde_json::Value)>>> =
+            Arc::new(Mutex::new(Vec::new()));
         let bodies = sent_bodies.clone();
         let bodies2 = bodies.clone();
         let rt = recovery_transport.clone();
@@ -2363,9 +2636,17 @@ mod websocket_transport {
                 WsReply::Close
             } else {
                 let (rid, mid, text) = if request_num == 1 {
-                    ("resp_1".to_string(), "msg_1".to_string(), "Hello".to_string())
+                    (
+                        "resp_1".to_string(),
+                        "msg_1".to_string(),
+                        "Hello".to_string(),
+                    )
                 } else {
-                    ("resp_2".to_string(), "msg_2".to_string(), "Recovered".to_string())
+                    (
+                        "resp_2".to_string(),
+                        "msg_2".to_string(),
+                        "Recovered".to_string(),
+                    )
                 };
                 WsReply::Frames(completed_frame(&rid, &mid, &text))
             }
@@ -2391,7 +2672,12 @@ mod websocket_transport {
             messages: vec![Message::user_from_string("Say hello")],
             ..Default::default()
         };
-        let (_, first) = collect_events(stream_codex(&codex_model("gpt-5.4"), ctx.clone(), first_opts)).await;
+        let (_, first) = collect_events(stream_codex(
+            &codex_model("gpt-5.4"),
+            ctx.clone(),
+            first_opts,
+        ))
+        .await;
 
         append_message(&mut ctx, first);
         ctx.messages.push(Message::user_from_string("Now finish"));
@@ -2403,10 +2689,15 @@ mod websocket_transport {
             transport: CodexTransport::WebsocketCached,
             ..Default::default()
         };
-        let (events, second) = collect_events(stream_codex(&codex_model("gpt-5.4"), ctx, second_opts)).await;
+        let (events, second) =
+            collect_events(stream_codex(&codex_model("gpt-5.4"), ctx, second_opts)).await;
 
         assert_eq!(stop_reason_of(&second), "stop");
-        let expected_text = if recovery_transport == "sse" { "Hello" } else { "Recovered" };
+        let expected_text = if recovery_transport == "sse" {
+            "Hello"
+        } else {
+            "Recovered"
+        };
         assert_eq!(text_of(&second), expected_text);
         assert_eq!(
             events
@@ -2415,7 +2706,9 @@ mod websocket_transport {
                 .count(),
             1
         );
-        assert!(events.iter().all(|e| !matches!(e, AssistantMessageEvent::Error { .. })));
+        assert!(events
+            .iter()
+            .all(|e| !matches!(e, AssistantMessageEvent::Error { .. })));
 
         let bodies = bodies2.lock().unwrap();
         assert_eq!(bodies.len(), 3);
@@ -2439,8 +2732,14 @@ mod websocket_transport {
         assert_eq!(stats.connections_reused, 1);
         assert_eq!(stats.full_context_requests, 2);
         assert_eq!(stats.delta_requests, 1);
-        assert_eq!(stats.websocket_failures, if recovery_transport == "sse" { 1 } else { 0 });
-        assert_eq!(stats.sse_fallbacks, if recovery_transport == "sse" { 1 } else { 0 });
+        assert_eq!(
+            stats.websocket_failures,
+            if recovery_transport == "sse" { 1 } else { 0 }
+        );
+        assert_eq!(
+            stats.sse_fallbacks,
+            if recovery_transport == "sse" { 1 } else { 0 }
+        );
         server.shutdown();
     }
 }
@@ -2532,7 +2831,12 @@ mod browser_login {
         OAuthProviderConfig {
             base_url: "https://chatgpt.com/backend-api".to_string(),
             client_id: "app_EMoamEEZ73f0CkXaXp7hrann".to_string(),
-            scopes: vec!["openid".into(), "profile".into(), "email".into(), "offline_access".into()],
+            scopes: vec![
+                "openid".into(),
+                "profile".into(),
+                "email".into(),
+                "offline_access".into(),
+            ],
             auth_url: Some("https://auth.openai.com/oauth/authorize".to_string()),
             token_url: Some(token_url),
             device_auth_url: None,
@@ -2572,7 +2876,10 @@ mod browser_login {
         let token_server = MockServer::spawn(Arc::new(|req: &RecordedRequest| {
             assert_eq!(req.method, "POST");
             let form = req.form_body();
-            assert_eq!(form.get("grant_type").map(|s| s.as_str()), Some("authorization_code"));
+            assert_eq!(
+                form.get("grant_type").map(|s| s.as_str()),
+                Some("authorization_code")
+            );
             assert_eq!(
                 form.get("client_id").map(|s| s.as_str()),
                 Some("app_EMoamEEZ73f0CkXaXp7hrann")
@@ -2613,7 +2920,11 @@ mod browser_login {
         assert_eq!(credential.inner.refresh, "refresh-123");
         assert!(credential.inner.expires > chrono::Utc::now().timestamp_millis());
         assert_eq!(
-            credential.inner.extra.get("account_id").and_then(|v| v.as_str()),
+            credential
+                .inner
+                .extra
+                .get("account_id")
+                .and_then(|v| v.as_str()),
             Some("acc_browser")
         );
 
@@ -2630,7 +2941,12 @@ mod browser_login {
         assert!(auth_url.starts_with("https://auth.openai.com/oauth/authorize?"));
         let query: std::collections::HashMap<String, String> = auth_url
             .split_once('?')
-            .map(|(_, q)| q.split('&').filter_map(|p| p.split_once('=')).map(|(k, v)| (url_decode_compat(k), url_decode_compat(v))).collect())
+            .map(|(_, q)| {
+                q.split('&')
+                    .filter_map(|p| p.split_once('='))
+                    .map(|(k, v)| (url_decode_compat(k), url_decode_compat(v)))
+                    .collect()
+            })
             .unwrap();
         assert_eq!(query.get("response_type").map(|s| s.as_str()), Some("code"));
         assert_eq!(
@@ -2641,7 +2957,10 @@ mod browser_login {
             query.get("redirect_uri").map(|s| s.as_str()),
             Some("http://localhost:1455/auth/callback")
         );
-        assert_eq!(query.get("code_challenge_method").map(|s| s.as_str()), Some("S256"));
+        assert_eq!(
+            query.get("code_challenge_method").map(|s| s.as_str()),
+            Some("S256")
+        );
         assert_eq!(
             query.get("id_token_add_organizations").map(|s| s.as_str()),
             Some("true")
@@ -2662,10 +2981,16 @@ mod browser_login {
         let mut hasher = sha2::Sha256::new();
         hasher.update(verifier.as_bytes());
         let expected_challenge = base64url_encode_test(&hasher.finalize());
-        assert_eq!(&expected_challenge, challenge, "S256(code_verifier) == code_challenge");
+        assert_eq!(
+            &expected_challenge, challenge,
+            "S256(code_verifier) == code_challenge"
+        );
 
         // The manual code path wins: the pasted redirect URL's code is used.
-        assert_eq!(exchanged.form_body().get("code").map(|s| s.as_str()), Some("auth-code-123"));
+        assert_eq!(
+            exchanged.form_body().get("code").map(|s| s.as_str()),
+            Some("auth-code-123")
+        );
         token_server.shutdown();
     }
 
@@ -2690,7 +3015,10 @@ mod browser_login {
 
         // Wait until the authorize URL is published, then act as the browser.
         let auth_url = interaction.auth_url().await;
-        let state = query_params(&auth_url).get("state").cloned().expect("state");
+        let state = query_params(&auth_url)
+            .get("state")
+            .cloned()
+            .expect("state");
 
         // Browser redirects to the local callback with the code + state.
         let callback_url = format!(
@@ -2698,7 +3026,9 @@ mod browser_login {
             port,
             urlencode_compat(&state)
         );
-        let response = reqwest::get(&callback_url).await.expect("callback reaches local server");
+        let response = reqwest::get(&callback_url)
+            .await
+            .expect("callback reaches local server");
         assert!(response.status().is_success());
 
         let credential = login_task.await.expect("task").expect("login succeeds");
@@ -2706,7 +3036,10 @@ mod browser_login {
         assert_eq!(credential.inner.refresh, "refresh-123");
         // The exchanged code is the one delivered via the callback.
         assert_eq!(
-            token_server.recorded()[0].form_body().get("code").map(|s| s.as_str()),
+            token_server.recorded()[0]
+                .form_body()
+                .get("code")
+                .map(|s| s.as_str()),
             Some("cb-code-1")
         );
         token_server.shutdown();
@@ -2744,9 +3077,15 @@ mod browser_login {
         // The manual prompt answers with a bare code → login completes via it.
         gate.send(()).expect("release manual prompt");
         let credential = login_task.await.expect("task").expect("login succeeds");
-        assert_eq!(credential.inner.access, mock_access_token("acc_manual_fallback"));
         assert_eq!(
-            token_server.recorded()[0].form_body().get("code").map(|s| s.as_str()),
+            credential.inner.access,
+            mock_access_token("acc_manual_fallback")
+        );
+        assert_eq!(
+            token_server.recorded()[0]
+                .form_body()
+                .get("code")
+                .map(|s| s.as_str()),
             Some("manual-code-9")
         );
         token_server.shutdown();
@@ -2765,7 +3104,10 @@ mod browser_login {
             token_server.url(),
         ));
 
-        let err = auth.login(&interaction).await.expect_err("exchange failure surfaces");
+        let err = auth
+            .login(&interaction)
+            .await
+            .expect_err("exchange failure surfaces");
         assert!(
             err.to_string().contains("token exchange failed"),
             "err: {}",

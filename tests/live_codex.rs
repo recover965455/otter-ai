@@ -101,7 +101,12 @@ async fn live_codex_stream_returns_text_and_usage() {
         })
     );
 
-    assert_eq!(msg.stop_reason().unwrap_or_default(), "stop", "events: {:?}", types);
+    assert_eq!(
+        msg.stop_reason().unwrap_or_default(),
+        "stop",
+        "events: {:?}",
+        types
+    );
     let text = otter_ai::content_text(match &msg {
         Message::Assistant { content, .. } => content,
         _ => &[],
@@ -157,7 +162,12 @@ async fn live_codex_websocket_transport_returns_text_and_usage() {
         })
     );
 
-    assert_eq!(msg.stop_reason().unwrap_or_default(), "stop", "events: {:?}", types);
+    assert_eq!(
+        msg.stop_reason().unwrap_or_default(),
+        "stop",
+        "events: {:?}",
+        types
+    );
     let text = otter_ai::content_text(match &msg {
         Message::Assistant { content, .. } => content,
         _ => &[],
@@ -196,7 +206,10 @@ async fn live_models_full_stack_completes_from_file_credentials() {
         _ => &[],
     });
     assert!(!text.is_empty());
-    if let Message::Assistant { usage, model: m, .. } = &msg {
+    if let Message::Assistant {
+        usage, model: m, ..
+    } = &msg
+    {
         assert_eq!(m.as_deref(), Some(model.id.as_str()));
         println!("live full-stack usage: {:?}", usage);
     }

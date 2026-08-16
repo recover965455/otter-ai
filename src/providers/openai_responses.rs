@@ -248,7 +248,8 @@ pub fn stream_codex(
             Ok(()) => {
                 let reason = match &output {
                     Message::Assistant {
-                        stop_reason: Some(r), ..
+                        stop_reason: Some(r),
+                        ..
                     } => r.clone(),
                     _ => "stop".to_string(),
                 };
@@ -307,8 +308,7 @@ async fn run_codex(
         CacheRetention::None => None,
         _ => opts.session_id.clone(),
     };
-    let codex_session_id: Option<String> =
-        cache_session_id.as_deref().map(clamp_prompt_cache_key);
+    let codex_session_id: Option<String> = cache_session_id.as_deref().map(clamp_prompt_cache_key);
 
     let grammar_tool_input_properties =
         create_grammar_tool_input_properties(&context.tools).unwrap_or_default();
@@ -367,14 +367,12 @@ async fn run_codex(
                         retried_connection_limit = true;
                         continue;
                     }
-                    if aborted || (err.kind == CodexErrorKind::Api && !connection_limit_before_start)
+                    if aborted
+                        || (err.kind == CodexErrorKind::Api && !connection_limit_before_start)
                     {
                         return Err(err.message);
                     }
-                    websocket::record_websocket_failure(
-                        codex_session_id.as_deref(),
-                        &err.message,
-                    );
+                    websocket::record_websocket_failure(codex_session_id.as_deref(), &err.message);
                     if err.started {
                         return Err(err.message);
                     }
@@ -396,7 +394,16 @@ async fn run_codex(
         codex_session_id.as_deref(),
     );
 
-    process_sse_with_retry(model, opts, &headers, &body, output, es, &grammar_tool_input_properties).await
+    process_sse_with_retry(
+        model,
+        opts,
+        &headers,
+        &body,
+        output,
+        es,
+        &grammar_tool_input_properties,
+    )
+    .await
 }
 
 /// Terminal checks (TS: `assertSuccessfulOutput`).
@@ -655,7 +662,9 @@ pub fn convert_responses_messages(
                 }
                 messages.push(json!({ "role": "user", "content": parts }));
             }
-            Message::Assistant { content, provider, .. } => {
+            Message::Assistant {
+                content, provider, ..
+            } => {
                 let same_provider = provider == &model.provider_id;
                 let mut out: Vec<Value> = Vec::new();
                 let mut text_block_index = 0usize;
@@ -701,7 +710,10 @@ pub fn convert_responses_messages(
                             }));
                         }
                         ContentBlock::ToolCall {
-                            id, name, arguments, ..
+                            id,
+                            name,
+                            arguments,
+                            ..
                         } => {
                             if let Some(property) = grammar_tool_input_properties.get(name) {
                                 // TS: custom tool calls replay their grammar
@@ -726,7 +738,8 @@ pub fn convert_responses_messages(
                                 out.push(item);
                                 continue;
                             }
-                            let (call_id, item_id) = split_normalized_tool_call_id(id, allowed, same_provider);
+                            let (call_id, item_id) =
+                                split_normalized_tool_call_id(id, allowed, same_provider);
                             let mut item = json!({
                                 "type": "function_call",
                                 "call_id": call_id,
@@ -754,8 +767,7 @@ pub fn convert_responses_messages(
                 content,
                 ..
             } => {
-                let (call_id, _) =
-                    split_normalized_tool_call_id(tool_call_id, allowed, true);
+                let (call_id, _) = split_normalized_tool_call_id(tool_call_id, allowed, true);
                 let text = content
                     .iter()
                     .filter_map(|b| match b {
@@ -810,27 +822,24 @@ fn split_normalized_tool_call_id(
     }
     let (call_id, item_id) = split_tool_call_id(id);
     let normalized_call_id = normalize_id_part(&call_id);
-    let normalized_item_id = item_id
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .map(|iid| {
-            if same_provider {
-                if iid.starts_with("fc_") {
-                    normalize_id_part(iid)
-                } else {
-                    normalize_id_part(&format!("fc_{}", iid))
-                }
+    let normalized_item_id = item_id.as_deref().filter(|s| !s.is_empty()).map(|iid| {
+        if same_provider {
+            if iid.starts_with("fc_") {
+                normalize_id_part(iid)
             } else {
-                // Foreign tool call: rewrite the item id as fc_<shortHash> so
-                // the backend accepts it (TS: buildForeignResponsesItemId).
-                let hashed = format!("fc_{}", short_hash(iid));
-                if hashed.len() > 64 {
-                    hashed[..64].to_string()
-                } else {
-                    hashed
-                }
+                normalize_id_part(&format!("fc_{}", iid))
             }
-        });
+        } else {
+            // Foreign tool call: rewrite the item id as fc_<shortHash> so
+            // the backend accepts it (TS: buildForeignResponsesItemId).
+            let hashed = format!("fc_{}", short_hash(iid));
+            if hashed.len() > 64 {
+                hashed[..64].to_string()
+            } else {
+                hashed
+            }
+        }
+    });
     (normalized_call_id, normalized_item_id)
 }
 
@@ -1142,14 +1151,11 @@ fn parse_error_response_body(status: u16, raw: &str) -> String {
                     .and_then(|v| v.as_str())
                     .map(|p| format!(" ({} plan)", p.to_lowercase()))
                     .unwrap_or_default();
-                let mins = err
-                    .get("resets_at")
-                    .and_then(|v| v.as_i64())
-                    .map(|ts| {
-                        let reset_ms = ts.saturating_mul(1000);
-                        let now = chrono::Utc::now().timestamp_millis();
-                        ((reset_ms.saturating_sub(now)).max(0) as f64 / 60000.0).round() as i64
-                    });
+                let mins = err.get("resets_at").and_then(|v| v.as_i64()).map(|ts| {
+                    let reset_ms = ts.saturating_mul(1000);
+                    let now = chrono::Utc::now().timestamp_millis();
+                    ((reset_ms.saturating_sub(now)).max(0) as f64 / 60000.0).round() as i64
+                });
                 let when = mins
                     .map(|m| format!(" Try again in ~{} min.", m))
                     .unwrap_or_default();
@@ -1267,9 +1273,17 @@ async fn process_sse_with_retry(
 
     let events = process_sse_bytes(response.bytes_stream(), opts.signal.clone());
     let started = std::sync::atomic::AtomicBool::new(true);
-    process_codex_events(events, model, opts, output, es, &started, grammar_tool_input_properties)
-        .await
-        .map_err(|e| e.message)?;
+    process_codex_events(
+        events,
+        model,
+        opts,
+        output,
+        es,
+        &started,
+        grammar_tool_input_properties,
+    )
+    .await
+    .map_err(|e| e.message)?;
 
     assert_successful_output(output).map_err(|e| e.message)
 }
@@ -1376,8 +1390,9 @@ pub(crate) mod websocket {
     use std::sync::{Arc, OnceLock};
     use std::time::{Duration, Instant};
 
-    type WsStream =
-        tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
+    type WsStream = tokio_tungstenite::WebSocketStream<
+        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+    >;
     type SocketSlot = Arc<Mutex<Option<WsStream>>>;
 
     const DEFAULT_CONNECT_TIMEOUT_MS: u64 = 15_000;
@@ -1449,7 +1464,11 @@ pub(crate) mod websocket {
         if !present {
             return None;
         }
-        let mut stats = debug_stats_map().lock().get(session).cloned().unwrap_or_default();
+        let mut stats = debug_stats_map()
+            .lock()
+            .get(session)
+            .cloned()
+            .unwrap_or_default();
         stats.websocket_fallback_active = Some(is_sse_fallback_active(Some(session)));
         Some(stats)
     }
@@ -1882,12 +1901,8 @@ pub(crate) mod websocket {
         let request_id = cache_session_id
             .map(clamp_prompt_cache_key)
             .unwrap_or_else(crate::types::uuidv7);
-        let headers = build_websocket_headers(
-            &opts.extra_headers,
-            account_id,
-            &opts.api_key,
-            &request_id,
-        );
+        let headers =
+            build_websocket_headers(&opts.extra_headers, account_id, &opts.api_key, &request_id);
 
         if let Some(s) = &opts.signal {
             if s.is_cancelled() {
@@ -1926,7 +1941,10 @@ pub(crate) mod websocket {
                 .map(|a| a.len())
                 .unwrap_or(0) as u64;
             s.last_input_items = input_len;
-            if let Some(prev) = request_body.get("previous_response_id").and_then(|v| v.as_str()) {
+            if let Some(prev) = request_body
+                .get("previous_response_id")
+                .and_then(|v| v.as_str())
+            {
                 s.delta_requests += 1;
                 s.last_delta_input_items = Some(input_len);
                 s.last_previous_response_id = Some(prev.to_string());
@@ -2134,10 +2152,7 @@ pub(crate) mod websocket {
             }
         }
     }
-
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Codex event mapping (TS: mapCodexEvents) + projection (processResponsesStream)
@@ -2202,25 +2217,15 @@ where
                 let code = event
                     .get("code")
                     .and_then(|v| v.as_str())
-                    .or_else(|| {
-                        nested
-                            .and_then(|n| n.get("code"))
-                            .and_then(|v| v.as_str())
-                    });
-                let message = event
-                    .get("message")
-                    .and_then(|v| v.as_str())
-                    .or_else(|| {
-                        nested
-                            .and_then(|n| n.get("message"))
-                            .and_then(|v| v.as_str())
-                    });
+                    .or_else(|| nested.and_then(|n| n.get("code")).and_then(|v| v.as_str()));
+                let message = event.get("message").and_then(|v| v.as_str()).or_else(|| {
+                    nested
+                        .and_then(|n| n.get("message"))
+                        .and_then(|v| v.as_str())
+                });
                 let fallback = event.to_string();
                 return Err(CodexStreamError::api(
-                    format!(
-                        "Codex error: {}",
-                        message.or(code).unwrap_or(&fallback)
-                    ),
+                    format!("Codex error: {}", message.or(code).unwrap_or(&fallback)),
                     code.map(|c| c.to_string()),
                 ));
             }
@@ -2253,9 +2258,7 @@ where
                 match normalize_codex_status(response.get("status").and_then(|v| v.as_str())) {
                     Some(status) => response["status"] = json!(status),
                     None => {
-                        response
-                            .as_object_mut()
-                            .map(|m| m.remove("status"));
+                        response.as_object_mut().map(|m| m.remove("status"));
                     }
                 }
                 finalize_response(&response, model, opts, output, saw_tool_call, es)?;
@@ -2269,8 +2272,10 @@ where
                 }
             }
             "response.output_item.added" => {
-                let output_index =
-                    event.get("output_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                let output_index = event
+                    .get("output_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize;
                 let item = event.get("item").cloned().unwrap_or(Value::Null);
                 create_slot(
                     output,
@@ -2283,10 +2288,15 @@ where
                 );
             }
             "response.reasoning_summary_text.delta" | "response.reasoning_text.delta" => {
-                let output_index =
-                    event.get("output_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                let output_index = event
+                    .get("output_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize;
                 let delta = event.get("delta").and_then(|v| v.as_str()).unwrap_or("");
-                if let Some(slot) = slots.get(&output_index).filter(|s| s.kind == SlotKind::Thinking) {
+                if let Some(slot) = slots
+                    .get(&output_index)
+                    .filter(|s| s.kind == SlotKind::Thinking)
+                {
                     append_thinking(output, slot.content_index, delta);
                     es.push(AssistantMessageEvent::ThinkingDelta {
                         delta: delta.to_string(),
@@ -2294,9 +2304,14 @@ where
                 }
             }
             "response.reasoning_summary_part.done" => {
-                let output_index =
-                    event.get("output_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                if let Some(slot) = slots.get(&output_index).filter(|s| s.kind == SlotKind::Thinking) {
+                let output_index = event
+                    .get("output_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize;
+                if let Some(slot) = slots
+                    .get(&output_index)
+                    .filter(|s| s.kind == SlotKind::Thinking)
+                {
                     append_thinking(output, slot.content_index, "\n\n");
                     es.push(AssistantMessageEvent::ThinkingDelta {
                         delta: "\n\n".to_string(),
@@ -2304,10 +2319,15 @@ where
                 }
             }
             "response.output_text.delta" | "response.refusal.delta" => {
-                let output_index =
-                    event.get("output_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                let output_index = event
+                    .get("output_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize;
                 let delta = event.get("delta").and_then(|v| v.as_str()).unwrap_or("");
-                if let Some(slot) = slots.get(&output_index).filter(|s| s.kind == SlotKind::Text) {
+                if let Some(slot) = slots
+                    .get(&output_index)
+                    .filter(|s| s.kind == SlotKind::Text)
+                {
                     append_text(output, slot.content_index, delta);
                     es.push(AssistantMessageEvent::TextDelta {
                         delta: delta.to_string(),
@@ -2315,8 +2335,10 @@ where
                 }
             }
             "response.function_call_arguments.delta" => {
-                let output_index =
-                    event.get("output_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                let output_index = event
+                    .get("output_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize;
                 let delta = event.get("delta").and_then(|v| v.as_str()).unwrap_or("");
                 if let Some(slot) = slots
                     .get_mut(&output_index)
@@ -2325,8 +2347,7 @@ where
                     let ci = slot.content_index;
                     let mut partial = slot.partial_json.clone().unwrap_or_default();
                     partial.push_str(delta);
-                    if let Ok(Some(parsed)) =
-                        crate::utils::json_parse::parse_partial_json(&partial)
+                    if let Ok(Some(parsed)) = crate::utils::json_parse::parse_partial_json(&partial)
                     {
                         set_tool_arguments(output, ci, parsed);
                     }
@@ -2338,9 +2359,14 @@ where
                 }
             }
             "response.function_call_arguments.done" => {
-                let output_index =
-                    event.get("output_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                let arguments = event.get("arguments").and_then(|v| v.as_str()).unwrap_or("");
+                let output_index = event
+                    .get("output_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize;
+                let arguments = event
+                    .get("arguments")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 if let Some(slot) = slots
                     .get_mut(&output_index)
                     .filter(|s| s.kind == SlotKind::ToolCall && !s.custom_input)
@@ -2364,8 +2390,10 @@ where
                 }
             }
             "response.custom_tool_call_input.delta" => {
-                let output_index =
-                    event.get("output_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                let output_index = event
+                    .get("output_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize;
                 let delta = event.get("delta").and_then(|v| v.as_str()).unwrap_or("");
                 if let Some(slot) = slots
                     .get_mut(&output_index)
@@ -2383,8 +2411,10 @@ where
                 }
             }
             "response.custom_tool_call_input.done" => {
-                let output_index =
-                    event.get("output_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                let output_index = event
+                    .get("output_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize;
                 let input = event.get("input").and_then(|v| v.as_str()).unwrap_or("");
                 if let Some(slot) = slots
                     .get_mut(&output_index)
@@ -2405,8 +2435,10 @@ where
                 }
             }
             "response.output_item.done" => {
-                let output_index =
-                    event.get("output_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                let output_index = event
+                    .get("output_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize;
                 let item = event.get("item").cloned().unwrap_or(Value::Null);
                 let item_type = item.get("type").and_then(|v| v.as_str()).unwrap_or("");
                 let existing = slots.get(&output_index).cloned();
@@ -2459,11 +2491,9 @@ where
                                 .map(|arr| {
                                     arr.iter()
                                         .filter_map(|c| {
-                                            c.get("text")
-                                                .and_then(|t| t.as_str())
-                                                .or_else(|| {
-                                                    c.get("refusal").and_then(|t| t.as_str())
-                                                })
+                                            c.get("text").and_then(|t| t.as_str()).or_else(|| {
+                                                c.get("refusal").and_then(|t| t.as_str())
+                                            })
                                         })
                                         .collect::<Vec<_>>()
                                         .join("")
@@ -2489,7 +2519,9 @@ where
                         }
                     }
                     "function_call" => {
-                        if let Some(slot) = existing.filter(|s| s.kind == SlotKind::ToolCall && !s.custom_input) {
+                        if let Some(slot) =
+                            existing.filter(|s| s.kind == SlotKind::ToolCall && !s.custom_input)
+                        {
                             let arguments_str = item
                                 .get("arguments")
                                 .and_then(|v| v.as_str())
@@ -2501,8 +2533,12 @@ where
                             {
                                 set_tool_arguments(output, slot.content_index, parsed);
                             }
-                            let block = content_block(output, slot.content_index)
-                                .unwrap_or(ContentBlock::Text { text: String::new(), text_signature: None});
+                            let block = content_block(output, slot.content_index).unwrap_or(
+                                ContentBlock::Text {
+                                    text: String::new(),
+                                    text_signature: None,
+                                },
+                            );
                             es.push(AssistantMessageEvent::ToolcallEnd {
                                 content_index: slot.content_index,
                                 tool_call: block,
@@ -2521,8 +2557,12 @@ where
                                 .or_else(|| slot.partial_json.clone())
                                 .unwrap_or_default();
                             set_custom_tool_input(output, slot.content_index, &input_str);
-                            let block = content_block(output, slot.content_index)
-                                .unwrap_or(ContentBlock::Text { text: String::new(), text_signature: None});
+                            let block = content_block(output, slot.content_index).unwrap_or(
+                                ContentBlock::Text {
+                                    text: String::new(),
+                                    text_signature: None,
+                                },
+                            );
                             es.push(AssistantMessageEvent::ToolcallEnd {
                                 content_index: slot.content_index,
                                 tool_call: block,
@@ -2596,7 +2636,10 @@ fn create_slot(
         }
         "message" => {
             if let Message::Assistant { content, .. } = output {
-                content.push(ContentBlock::Text { text: String::new(), text_signature: None});
+                content.push(ContentBlock::Text {
+                    text: String::new(),
+                    text_signature: None,
+                });
             }
             es.push(AssistantMessageEvent::TextStart);
             Slot {
@@ -2692,10 +2735,7 @@ fn content_len(output: &AssistantMessage) -> usize {
     }
 }
 
-fn content_block_mut(
-    output: &mut AssistantMessage,
-    index: usize,
-) -> Option<&mut ContentBlock> {
+fn content_block_mut(output: &mut AssistantMessage, index: usize) -> Option<&mut ContentBlock> {
     match output {
         Message::Assistant { content, .. } => content.get_mut(index),
         _ => None,
@@ -2762,7 +2802,8 @@ fn finalize_response(
 ) -> Result<(), CodexStreamError> {
     if let Some(id) = response.get("id").and_then(|v| v.as_str()) {
         if let Message::Assistant {
-            ref mut response_id, ..
+            ref mut response_id,
+            ..
         } = output
         {
             *response_id = Some(id.to_string());
@@ -2816,13 +2857,14 @@ fn finalize_response(
         usage.cost.output *= multiplier;
         usage.cost.cache_read *= multiplier;
         usage.cost.cache_write *= multiplier;
-        usage.cost.total = usage.cost.input
-            + usage.cost.output
-            + usage.cost.cache_read
-            + usage.cost.cache_write;
+        usage.cost.total =
+            usage.cost.input + usage.cost.output + usage.cost.cache_read + usage.cost.cache_write;
     }
 
-    if let Message::Assistant { usage: ref mut u, .. } = output {
+    if let Message::Assistant {
+        usage: ref mut u, ..
+    } = output
+    {
         *u = usage.clone();
     }
     es.push(AssistantMessageEvent::Usage { usage });

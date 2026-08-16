@@ -192,12 +192,10 @@ pub fn parse_loose_credential(v: &Value) -> Option<Credential> {
             let env = obj
                 .get("env")
                 .and_then(|e| serde_json::from_value(e.clone()).ok());
-            Some(Credential::ApiKey(
-                crate::auth::types::ApiKeyCredential {
-                    key,
-                    env,
-                },
-            ))
+            Some(Credential::ApiKey(crate::auth::types::ApiKeyCredential {
+                key,
+                env,
+            }))
         }
         "oauth" => {
             // Native format deserialises directly.
@@ -230,10 +228,7 @@ pub fn parse_loose_credential(v: &Value) -> Option<Credential> {
                 .unwrap_or(0);
             let mut extra = HashMap::new();
             if let Some(acc) = obj.get("chatgpt_account_id").and_then(|a| a.as_str()) {
-                extra.insert(
-                    "account_id".to_string(),
-                    Value::String(acc.to_string()),
-                );
+                extra.insert("account_id".to_string(), Value::String(acc.to_string()));
             }
             if let Some(scope) = obj.get("scope").and_then(|s| s.as_str()) {
                 extra.insert("scope".to_string(), Value::String(scope.to_string()));

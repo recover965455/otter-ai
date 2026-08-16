@@ -74,8 +74,8 @@ pub use models_store::{InMemoryModelsStore, ModelsStore, ModelsStoreEntry};
 
 // Re-exports from auth
 pub use auth::{
-    default_provider_auth_context, parse_loose_credential, AuthContext, Credential, CredentialStore,
-    FileCredentialStore, InMemoryCredentialStore, ModelAuth,
+    default_provider_auth_context, parse_loose_credential, AuthContext, Credential,
+    CredentialStore, FileCredentialStore, InMemoryCredentialStore, ModelAuth,
 };
 
 // Re-exports from utils

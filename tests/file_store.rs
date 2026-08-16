@@ -2,17 +2,13 @@
 //! read/modify/write round-trips against a temp credentials file.
 
 use otter_ai::auth::{
-    parse_loose_credential, AuthOperationOptions, Credential, CredentialStore,
-    FileCredentialStore, ModifyFnOutput,
+    parse_loose_credential, AuthOperationOptions, Credential, CredentialStore, FileCredentialStore,
+    ModifyFnOutput,
 };
 use serde_json::json;
 
 fn temp_store(tag: &str) -> FileCredentialStore {
-    let dir = std::env::temp_dir().join(format!(
-        "otter-cred-test-{}-{}",
-        tag,
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir().join(format!("otter-cred-test-{}-{}", tag, std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     FileCredentialStore::with_path(dir.join("credentials.json"))
 }
@@ -95,9 +91,7 @@ async fn round_trips_credentials_through_the_file() {
     store
         .modify_fn(
             "deepseek",
-            Box::new(move |_| {
-                Box::pin(async move { Ok(Some(new_cred_clone)) }) as ModifyFnOutput
-            }),
+            Box::new(move |_| Box::pin(async move { Ok(Some(new_cred_clone)) }) as ModifyFnOutput),
             AuthOperationOptions::default(),
         )
         .await
@@ -188,9 +182,7 @@ fn store_write_again(store: &FileCredentialStore) {
         store
             .modify_fn(
                 "x",
-                Box::new(move |_| {
-                    Box::pin(async move { Ok(Some(cred)) }) as ModifyFnOutput
-                }),
+                Box::new(move |_| Box::pin(async move { Ok(Some(cred)) }) as ModifyFnOutput),
                 AuthOperationOptions::default(),
             )
             .await

@@ -67,7 +67,10 @@ async fn complete_with_model(
 fn user_context(text: &str) -> Context {
     Context {
         messages: vec![Message::User {
-            content: vec![ContentBlock::Text { text: text.into(), text_signature: None}],
+            content: vec![ContentBlock::Text {
+                text: text.into(),
+                text_signature: None,
+            }],
             timestamp: 0,
         }],
         ..Default::default()
@@ -127,8 +130,8 @@ mod faux_provider {
             messages: vec![Message::User {
                 content: vec![ContentBlock::Text {
                     text: "hi there".into(),
-                text_signature: None,
-            }],
+                    text_signature: None,
+                }],
                 timestamp: 0,
             }],
             ..Default::default()
@@ -142,8 +145,8 @@ mod faux_provider {
                     content,
                     &vec![ContentBlock::Text {
                         text: "hello world".into(),
-                    text_signature: None,
-                }]
+                        text_signature: None,
+                    }]
                 );
             }
             _ => panic!("expected assistant message"),
@@ -258,8 +261,8 @@ mod faux_provider {
                     content,
                     &vec![ContentBlock::Text {
                         text: "faux-fast:false".into(),
-                    text_signature: None,
-                }]
+                        text_signature: None,
+                    }]
                 );
             }
             _ => panic!("expected assistant message"),
@@ -273,8 +276,8 @@ mod faux_provider {
                     content,
                     &vec![ContentBlock::Text {
                         text: "faux-thinker:true".into(),
-                    text_signature: None,
-                }]
+                        text_signature: None,
+                    }]
                 );
             }
             _ => panic!("expected assistant message"),
@@ -340,8 +343,8 @@ mod faux_provider {
                     content,
                     &vec![ContentBlock::Text {
                         text: "first".into(),
-                    text_signature: None,
-                }]
+                        text_signature: None,
+                    }]
                 );
             }
             _ => panic!("expected assistant message"),
@@ -356,8 +359,8 @@ mod faux_provider {
                     content,
                     &vec![ContentBlock::Text {
                         text: "second".into(),
-                    text_signature: None,
-                }]
+                        text_signature: None,
+                    }]
                 );
             }
             _ => panic!("expected assistant message"),
@@ -397,8 +400,8 @@ mod faux_provider {
                     content,
                     &vec![ContentBlock::Text {
                         text: "first".into(),
-                    text_signature: None,
-                }]
+                        text_signature: None,
+                    }]
                 );
             }
             _ => panic!("expected assistant"),
@@ -420,8 +423,8 @@ mod faux_provider {
                     content,
                     &vec![ContentBlock::Text {
                         text: "second".into(),
-                    text_signature: None,
-                }]
+                        text_signature: None,
+                    }]
                 );
             }
             _ => panic!("expected assistant"),
@@ -448,8 +451,8 @@ mod faux_provider {
                     content,
                     &vec![ContentBlock::Text {
                         text: "third".into(),
-                    text_signature: None,
-                }]
+                        text_signature: None,
+                    }]
                 );
             }
             _ => panic!("expected assistant"),
@@ -462,8 +465,8 @@ mod faux_provider {
                     content,
                     &vec![ContentBlock::Text {
                         text: "fourth".into(),
-                    text_signature: None,
-                }]
+                        text_signature: None,
+                    }]
                 );
             }
             _ => panic!("expected assistant"),
@@ -490,7 +493,13 @@ mod faux_provider {
             .unwrap();
         match &response {
             Message::Assistant { content, .. } => {
-                assert_eq!(content, &vec![ContentBlock::Text { text: "1:1".into(), text_signature: None}]);
+                assert_eq!(
+                    content,
+                    &vec![ContentBlock::Text {
+                        text: "1:1".into(),
+                        text_signature: None
+                    }]
+                );
             }
             _ => panic!("expected assistant message"),
         }
@@ -598,8 +607,8 @@ mod faux_provider {
                     content: vec![
                         ContentBlock::Text {
                             text: "hello".into(),
-                        text_signature: None,
-                    },
+                            text_signature: None,
+                        },
                         ContentBlock::Image(ImageContent {
                             content_type: "image".into(),
                             data: "abcd".into(),
@@ -614,8 +623,8 @@ mod faux_provider {
                     tool_name: "echo".into(),
                     content: vec![ContentBlock::Text {
                         text: "tool out".into(),
-                    text_signature: None,
-                }],
+                        text_signature: None,
+                    }],
                     is_error: false,
                     timestamp: 2,
                 },
@@ -678,8 +687,8 @@ mod faux_provider {
         context.messages.push(Message::User {
             content: vec![ContentBlock::Text {
                 text: "follow up".into(),
-            text_signature: None,
-        }],
+                text_signature: None,
+            }],
             timestamp: 1,
         });
 
@@ -720,8 +729,8 @@ mod faux_provider {
             messages: vec![Message::User {
                 content: vec![ContentBlock::Text {
                     text: "hello".into(),
-                text_signature: None,
-            }],
+                    text_signature: None,
+                }],
                 timestamp: 0,
             }],
             ..Default::default()
@@ -744,8 +753,8 @@ mod faux_provider {
         context.messages.push(Message::User {
             content: vec![ContentBlock::Text {
                 text: "follow up".into(),
-            text_signature: None,
-        }],
+                text_signature: None,
+            }],
             timestamp: 1,
         });
 
@@ -789,8 +798,8 @@ mod faux_provider {
         context.messages.push(Message::User {
             content: vec![ContentBlock::Text {
                 text: "follow up".into(),
-            text_signature: None,
-        }],
+                text_signature: None,
+            }],
             timestamp: 1,
         });
 

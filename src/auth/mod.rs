@@ -2,14 +2,17 @@ pub mod context;
 pub mod types;
 
 use crate::types::CancellationToken;
-pub use context::{default_provider_auth_context, parse_loose_credential, DefaultAuthContext, FileCredentialStore, InMemoryCredentialStore};
+pub use crate::types::ProviderEnv;
+pub use context::{
+    default_provider_auth_context, parse_loose_credential, DefaultAuthContext, FileCredentialStore,
+    InMemoryCredentialStore,
+};
 pub use types::{
     ApiKeyAuth, ApiKeyCredential, AuthCheck, AuthContext, AuthEvent, AuthInfoLink, AuthInteraction,
     AuthOperationOptions, AuthPrompt, AuthResult, AuthSelectOption, AuthType, Credential,
     CredentialInfo, CredentialStore, ModelAuth, ModifyFnOutput, OAuthAuth, OAuthCredential,
     OAuthCredentials, ProviderAuth,
 };
-pub use crate::types::ProviderEnv;
 
 #[derive(Default)]
 pub struct AuthResolutionOverrides {
@@ -141,9 +144,5 @@ pub async fn resolve_provider_auth(
         source = Some("ambient".to_string());
     }
 
-    Ok(AuthResult {
-        auth,
-        env,
-        source,
-    })
+    Ok(AuthResult { auth, env, source })
 }

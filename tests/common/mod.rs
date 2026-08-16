@@ -31,7 +31,9 @@ pub struct RecordedRequest {
 
 impl RecordedRequest {
     pub fn header(&self, name: &str) -> Option<&str> {
-        self.headers.get(&name.to_ascii_lowercase()).map(|s| s.as_str())
+        self.headers
+            .get(&name.to_ascii_lowercase())
+            .map(|s| s.as_str())
     }
 
     pub fn json_body(&self) -> serde_json::Value {
@@ -52,10 +54,12 @@ impl RecordedRequest {
 fn maybe_decompress_request_body(headers: &HashMap<String, String>, body: Vec<u8>) -> Vec<u8> {
     #[cfg(feature = "codex-zstd")]
     {
-        let encoding = headers.get("content-encoding").map(|s| s.as_str()).unwrap_or("");
+        let encoding = headers
+            .get("content-encoding")
+            .map(|s| s.as_str())
+            .unwrap_or("");
         if encoding.contains("zstd") {
-            return zstd::decode_all(std::io::Cursor::new(body))
-                .unwrap_or_default();
+            return zstd::decode_all(std::io::Cursor::new(body)).unwrap_or_default();
         }
     }
     body
@@ -213,7 +217,9 @@ impl MockServer {
     }
 
     pub async fn spawn(handler: RequestHandler) -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind mock server");
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind mock server");
         let addr = listener.local_addr().expect("local addr");
         let requests: Arc<Mutex<Vec<RecordedRequest>>> = Arc::new(Mutex::new(Vec::new()));
         let reqs = requests.clone();
@@ -474,11 +480,7 @@ pub fn basic_completion_events(status: &str, end_turn: Option<bool>) -> Vec<Stri
     ]
 }
 
-pub fn usage_events_with_tier(
-    input: u64,
-    output: u64,
-    service_tier: Option<&str>,
-) -> Vec<String> {
+pub fn usage_events_with_tier(input: u64, output: u64, service_tier: Option<&str>) -> Vec<String> {
     let mut response = serde_json::json!({
         "status": "completed",
         "usage": {
@@ -533,12 +535,15 @@ pub mod ws {
     /// Handler receiving (connection id, per-connection request index, path,
     /// headers, parsed frame) and returning what to send back.
     pub type WsHandler = Arc<
-        dyn Fn(usize, usize, &str, &HashMap<String, String>, serde_json::Value) -> WsReply + Send + Sync,
+        dyn Fn(usize, usize, &str, &HashMap<String, String>, serde_json::Value) -> WsReply
+            + Send
+            + Sync,
     >;
 
     /// Plain HTTP handler used by the combined server for the SSE fallback
     /// requests that hit the same port.
-    pub type HttpHandler = Arc<dyn Fn(&super::RecordedRequest) -> super::MockResponse + Send + Sync>;
+    pub type HttpHandler =
+        Arc<dyn Fn(&super::RecordedRequest) -> super::MockResponse + Send + Sync>;
 
     pub struct WsMockServer {
         pub addr: std::net::SocketAddr,
@@ -557,7 +562,9 @@ pub mod ws {
 
     impl WsRecordedRequest {
         pub fn header(&self, name: &str) -> Option<&str> {
-            self.headers.get(&name.to_ascii_lowercase()).map(|s| s.as_str())
+            self.headers
+                .get(&name.to_ascii_lowercase())
+                .map(|s| s.as_str())
         }
     }
 
@@ -577,7 +584,9 @@ pub mod ws {
         }
 
         pub async fn spawn(handler: WsHandler) -> Self {
-            let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind ws mock");
+            let listener = TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("bind ws mock");
             let addr = listener.local_addr().expect("ws addr");
             let requests: Arc<Mutex<Vec<WsRecordedRequest>>> = Arc::new(Mutex::new(Vec::new()));
             let reqs = requests.clone();
@@ -610,7 +619,9 @@ pub mod ws {
         /// plain HTTP (SSE fallback) requests with `http_handler` on the same
         /// port — mirrors the real backend where both share one URL.
         pub async fn spawn_combined(ws_handler: WsHandler, http_handler: HttpHandler) -> Self {
-            let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind ws mock");
+            let listener = TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("bind ws mock");
             let addr = listener.local_addr().expect("ws addr");
             let requests: Arc<Mutex<Vec<WsRecordedRequest>>> = Arc::new(Mutex::new(Vec::new()));
             let http_requests: Arc<Mutex<Vec<super::RecordedRequest>>> =
@@ -631,8 +642,15 @@ pub mod ws {
                     let http_reqs = http_reqs.clone();
                     let conns = conns_handle.clone();
                     tokio::spawn(async move {
-                        let _ = serve_combined(stream, ws_handler, http_handler, reqs, http_reqs, conns)
-                            .await;
+                        let _ = serve_combined(
+                            stream,
+                            ws_handler,
+                            http_handler,
+                            reqs,
+                            http_reqs,
+                            conns,
+                        )
+                        .await;
                     });
                 }
             });
@@ -648,7 +666,9 @@ pub mod ws {
         /// never answered (handshake hangs until the client's connect
         /// timeout), while HTTP requests are served normally.
         pub async fn spawn_combined_pending_handshake(http_handler: HttpHandler) -> Self {
-            let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind ws mock");
+            let listener = TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("bind ws mock");
             let addr = listener.local_addr().expect("ws addr");
             let requests: Arc<Mutex<Vec<WsRecordedRequest>>> = Arc::new(Mutex::new(Vec::new()));
             let http_requests: Arc<Mutex<Vec<super::RecordedRequest>>> =
@@ -680,7 +700,9 @@ pub mod ws {
         /// Server that accepts TCP connections but never completes the
         /// WebSocket handshake (for connect-timeout tests).
         pub async fn spawn_pending_handshake() -> Self {
-            let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind ws mock");
+            let listener = TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("bind ws mock");
             let addr = listener.local_addr().expect("ws addr");
             let requests: Arc<Mutex<Vec<WsRecordedRequest>>> = Arc::new(Mutex::new(Vec::new()));
             let handle = tokio::spawn(async move {
@@ -759,8 +781,12 @@ pub mod ws {
         handler: WsHandler,
         requests: Arc<Mutex<Vec<WsRecordedRequest>>>,
     ) where
-        S: futures::Stream<Item = Result<tokio_tungstenite::tungstenite::Message, tokio_tungstenite::tungstenite::Error>>
-            + futures::Sink<tokio_tungstenite::tungstenite::Message>
+        S: futures::Stream<
+                Item = Result<
+                    tokio_tungstenite::tungstenite::Message,
+                    tokio_tungstenite::tungstenite::Error,
+                >,
+            > + futures::Sink<tokio_tungstenite::tungstenite::Message>
             + Unpin,
     {
         use futures::{SinkExt, StreamExt};
@@ -790,7 +816,9 @@ pub mod ws {
                 WsReply::Frames(replies) => {
                     for reply in replies {
                         if ws
-                            .send(tokio_tungstenite::tungstenite::Message::Text(reply.to_string()))
+                            .send(tokio_tungstenite::tungstenite::Message::Text(
+                                reply.to_string(),
+                            ))
                             .await
                             .is_err()
                         {

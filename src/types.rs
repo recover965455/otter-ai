@@ -225,7 +225,10 @@ pub enum Message {
 impl Message {
     pub fn user_from_string<S: Into<String>>(text: S) -> Self {
         Message::User {
-            content: vec![ContentBlock::Text { text: text.into(), text_signature: None}],
+            content: vec![ContentBlock::Text {
+                text: text.into(),
+                text_signature: None,
+            }],
             timestamp: default_timestamp(),
         }
     }
