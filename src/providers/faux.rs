@@ -15,14 +15,19 @@ use std::sync::{Arc, Mutex};
 use futures::StreamExt;
 use rand::Rng;
 
-use crate::auth::types::{ApiKeyAuth, ApiKeyCredential, AuthCheck, AuthContext, AuthInteraction, AuthPrompt, AuthResult, ProviderAuth};
+use crate::auth::types::{
+    ApiKeyAuth, ApiKeyCredential, AuthCheck, AuthContext, AuthInteraction, AuthPrompt, AuthResult,
+    ProviderAuth,
+};
 use crate::providers::{Provider, RefreshModelsContext};
 use crate::types::{
     ApiStreamOptions, AssistantMessage, AssistantMessageEvent, CacheRetention, CancellationToken,
-    Context, ContentBlock, Message, Model, ModelThinkingLevel, SimpleStreamOptions,
-    Usage, UsageCost,
+    ContentBlock, Context, Message, Model, ModelThinkingLevel, SimpleStreamOptions, Usage,
+    UsageCost,
 };
-use crate::utils::event_stream::{create_assistant_message_event_stream, AssistantMessageEventStream};
+use crate::utils::event_stream::{
+    create_assistant_message_event_stream, AssistantMessageEventStream,
+};
 
 // ---------- constants ----------
 const DEFAULT_API: &str = "faux";
@@ -75,9 +80,7 @@ pub struct FauxToolCallOptions {
 
 pub type FauxContentBlock = ContentBlock;
 
-fn normalize_content(
-    content: impl Into<FauxContentInput>,
-) -> Vec<ContentBlock> {
+fn normalize_content(content: impl Into<FauxContentInput>) -> Vec<ContentBlock> {
     match content.into() {
         FauxContentInput::String(s) => vec![faux_text(s)],
         FauxContentInput::Block(b) => vec![b],
@@ -92,16 +95,24 @@ pub enum FauxContentInput {
 }
 
 impl From<String> for FauxContentInput {
-    fn from(s: String) -> Self { FauxContentInput::String(s) }
+    fn from(s: String) -> Self {
+        FauxContentInput::String(s)
+    }
 }
 impl From<&str> for FauxContentInput {
-    fn from(s: &str) -> Self { FauxContentInput::String(s.into()) }
+    fn from(s: &str) -> Self {
+        FauxContentInput::String(s.into())
+    }
 }
 impl From<ContentBlock> for FauxContentInput {
-    fn from(b: ContentBlock) -> Self { FauxContentInput::Block(b) }
+    fn from(b: ContentBlock) -> Self {
+        FauxContentInput::Block(b)
+    }
 }
 impl From<Vec<ContentBlock>> for FauxContentInput {
-    fn from(b: Vec<ContentBlock>) -> Self { FauxContentInput::Blocks(b) }
+    fn from(b: Vec<ContentBlock>) -> Self {
+        FauxContentInput::Blocks(b)
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -116,7 +127,9 @@ pub fn faux_assistant_message(
     content: impl Into<FauxContentInput>,
     options: FauxAssistantMessageOptions,
 ) -> AssistantMessage {
-    let ts = options.timestamp.unwrap_or_else(|| chrono::Utc::now().timestamp_millis());
+    let ts = options
+        .timestamp
+        .unwrap_or_else(|| chrono::Utc::now().timestamp_millis());
     let stop_reason = options.stop_reason.unwrap_or_else(|| "stop".to_string());
     Message::Assistant {
         content: normalize_content(content),
@@ -205,11 +218,21 @@ fn random_id(prefix: &str) -> String {
     use rand::RngCore;
     let mut buf = [0u8; 8];
     rand::thread_rng().fill_bytes(&mut buf);
-    format!("{}:{}:{}", prefix, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis(), hex::encode(&buf[..4]))
+    format!(
+        "{}:{}:{}",
+        prefix,
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis(),
+        hex::encode(&buf[..4])
+    )
 }
 
 fn estimate_tokens(text: &str) -> u64 {
-    if text.is_empty() { return 0; }
+    if text.is_empty() {
+        return 0;
+    }
     ((text.len() as f64) / 4.0).ceil() as u64
 }
 
@@ -221,7 +244,9 @@ fn content_to_text(content: &[ContentBlock]) -> String {
             ContentBlock::Image(img) => {
                 format!(
                     "[image:{}:{}]",
-                    img.mime_type.as_deref().unwrap_or("application/octet-stream"),
+                    img.mime_type
+                        .as_deref()
+                        .unwrap_or("application/octet-stream"),
                     img.data.len()
                 )
             }
@@ -237,7 +262,9 @@ fn assistant_content_to_text(content: &[ContentBlock]) -> String {
         .map(|b| match b {
             ContentBlock::Text { text } => text.clone(),
             ContentBlock::Thinking { thinking, .. } => thinking.clone(),
-            ContentBlock::ToolCall { name, arguments, .. } => {
+            ContentBlock::ToolCall {
+                name, arguments, ..
+            } => {
                 format!("{}:{}", name, arguments)
             }
             _ => String::new(),
@@ -362,7 +389,12 @@ fn split_by_token_size(text: &str, min: usize, max: usize) -> Vec<String> {
     out
 }
 
-fn clone_message(mut m: AssistantMessage, api: &str, provider: &str, model_id: &str) -> AssistantMessage {
+fn clone_message(
+    mut m: AssistantMessage,
+    api: &str,
+    provider: &str,
+    model_id: &str,
+) -> AssistantMessage {
     if let Message::Assistant {
         api: ref mut a,
         provider: ref mut p,
@@ -385,7 +417,12 @@ fn clone_message(mut m: AssistantMessage, api: &str, provider: &str, model_id: &
     m
 }
 
-fn create_error_message(err: String, api: &str, provider: &str, model_id: &str) -> AssistantMessage {
+fn create_error_message(
+    err: String,
+    api: &str,
+    provider: &str,
+    model_id: &str,
+) -> AssistantMessage {
     Message::Assistant {
         content: vec![],
         api: api.to_string(),
@@ -414,8 +451,14 @@ fn create_aborted_message(mut partial: AssistantMessage) -> AssistantMessage {
 
 fn error_str(msg: &Message) -> String {
     match msg {
-        Message::Assistant { error_message: Some(e), .. } => e.clone(),
-        Message::Assistant { stop_reason: Some(r), .. } => r.clone(),
+        Message::Assistant {
+            error_message: Some(e),
+            ..
+        } => e.clone(),
+        Message::Assistant {
+            stop_reason: Some(r),
+            ..
+        } => r.clone(),
         _ => "unknown error".to_string(),
     }
 }
@@ -441,7 +484,11 @@ async fn schedule_chunk(chars: &str, tokens_per_second: Option<u64>) {
 }
 
 fn terminal_stop_reason(m: &AssistantMessage) -> Option<&str> {
-    if let Message::Assistant { stop_reason: Some(sr), .. } = m {
+    if let Message::Assistant {
+        stop_reason: Some(sr),
+        ..
+    } = m
+    {
         Some(sr.as_str())
     } else {
         None
@@ -488,15 +535,16 @@ async fn stream_with_deltas(
     };
 
     let mut aborted_here = false;
-    let mut abort_emit_and_return = |stream: &AssistantMessageEventStream, partial: &AssistantMessage| -> bool {
-        let a = create_aborted_message(partial.clone());
-        stream.push(AssistantMessageEvent::Error {
-            reason: "aborted".into(),
-            error: error_str(&a),
-        });
-        stream.end(Some(a));
-        true
-    };
+    let mut abort_emit_and_return =
+        |stream: &AssistantMessageEventStream, partial: &AssistantMessage| -> bool {
+            let a = create_aborted_message(partial.clone());
+            stream.push(AssistantMessageEvent::Error {
+                reason: "aborted".into(),
+                error: error_str(&a),
+            });
+            stream.end(Some(a));
+            true
+        };
 
     for (index, block) in blocks.iter().enumerate() {
         if signal.map(|s| s.is_cancelled()).unwrap_or(false) {
@@ -504,8 +552,14 @@ async fn stream_with_deltas(
             break;
         }
         match block {
-            ContentBlock::Thinking { thinking, signature } => {
-                if let Message::Assistant { ref mut content, .. } = &mut partial {
+            ContentBlock::Thinking {
+                thinking,
+                signature,
+            } => {
+                if let Message::Assistant {
+                    ref mut content, ..
+                } = &mut partial
+                {
                     content.push(ContentBlock::Thinking {
                         thinking: String::new(),
                         signature: signature.clone(),
@@ -518,21 +572,34 @@ async fn stream_with_deltas(
                         aborted_here = abort_emit_and_return(stream, &partial);
                         break;
                     }
-                    if let Message::Assistant { ref mut content, .. } = &mut partial {
-                        if let Some(ContentBlock::Thinking { ref mut thinking, .. }) = content.get_mut(index) {
+                    if let Message::Assistant {
+                        ref mut content, ..
+                    } = &mut partial
+                    {
+                        if let Some(ContentBlock::Thinking {
+                            ref mut thinking, ..
+                        }) = content.get_mut(index)
+                        {
                             thinking.push_str(&chunk);
                         }
                     }
                     stream.push(AssistantMessageEvent::ThinkingDelta { delta: chunk });
                 }
-                if aborted_here { break; }
+                if aborted_here {
+                    break;
+                }
                 stream.push(AssistantMessageEvent::ThinkingEnd {
                     signature: signature.clone(),
                 });
             }
             ContentBlock::Text { text } => {
-                if let Message::Assistant { ref mut content, .. } = &mut partial {
-                    content.push(ContentBlock::Text { text: String::new() });
+                if let Message::Assistant {
+                    ref mut content, ..
+                } = &mut partial
+                {
+                    content.push(ContentBlock::Text {
+                        text: String::new(),
+                    });
                 }
                 stream.push(AssistantMessageEvent::TextStart);
                 for chunk in split_by_token_size(text, min_token_size, max_token_size) {
@@ -541,18 +608,30 @@ async fn stream_with_deltas(
                         aborted_here = abort_emit_and_return(stream, &partial);
                         break;
                     }
-                    if let Message::Assistant { ref mut content, .. } = &mut partial {
+                    if let Message::Assistant {
+                        ref mut content, ..
+                    } = &mut partial
+                    {
                         if let Some(ContentBlock::Text { ref mut text }) = content.get_mut(index) {
                             text.push_str(&chunk);
                         }
                     }
                     stream.push(AssistantMessageEvent::TextDelta { delta: chunk });
                 }
-                if aborted_here { break; }
+                if aborted_here {
+                    break;
+                }
                 stream.push(AssistantMessageEvent::TextEnd);
             }
-            ContentBlock::ToolCall { id, name, arguments } => {
-                if let Message::Assistant { ref mut content, .. } = &mut partial {
+            ContentBlock::ToolCall {
+                id,
+                name,
+                arguments,
+            } => {
+                if let Message::Assistant {
+                    ref mut content, ..
+                } = &mut partial
+                {
                     content.push(ContentBlock::ToolCall {
                         id: id.clone(),
                         name: name.clone(),
@@ -576,9 +655,17 @@ async fn stream_with_deltas(
                         delta: chunk,
                     });
                 }
-                if aborted_here { break; }
-                if let Message::Assistant { ref mut content, .. } = &mut partial {
-                    if let Some(ContentBlock::ToolCall { ref mut arguments, .. }) = content.get_mut(index) {
+                if aborted_here {
+                    break;
+                }
+                if let Message::Assistant {
+                    ref mut content, ..
+                } = &mut partial
+                {
+                    if let Some(ContentBlock::ToolCall {
+                        ref mut arguments, ..
+                    }) = content.get_mut(index)
+                    {
                         *arguments = arguments.clone();
                     }
                 }
@@ -598,9 +685,18 @@ async fn stream_with_deltas(
         Some("pending") | None => {
             let err = create_error_message(
                 "Faux response ended without a stop reason".into(),
-                match &message { Message::Assistant { api, .. } => api, _ => "" },
-                match &message { Message::Assistant { provider, .. } => provider, _ => "" },
-                match &message { Message::Assistant { model: Some(m), .. } => m.as_str(), _ => "" },
+                match &message {
+                    Message::Assistant { api, .. } => api,
+                    _ => "",
+                },
+                match &message {
+                    Message::Assistant { provider, .. } => provider,
+                    _ => "",
+                },
+                match &message {
+                    Message::Assistant { model: Some(m), .. } => m.as_str(),
+                    _ => "",
+                },
             );
             stream.push(AssistantMessageEvent::Error {
                 reason: "error".into(),
@@ -687,7 +783,11 @@ impl FauxCore {
                 supports_tool_calling: true,
                 supports_structured_output: false,
                 supports_system_prompt: true,
-                thinking: if def.reasoning { ModelThinkingLevel::Medium } else { ModelThinkingLevel::None },
+                thinking: if def.reasoning {
+                    ModelThinkingLevel::Medium
+                } else {
+                    ModelThinkingLevel::None
+                },
                 reasoning: def.reasoning,
                 cost_rates: def.cost_rates,
                 context_window: def.context_window,
@@ -748,7 +848,15 @@ impl FauxCore {
         };
         let resolved = match step {
             FauxResponseStep::Message(m) => m,
-            FauxResponseStep::Factory(factory) => factory(ctx.clone(), stream_opts.clone(), state_snap, request_model.clone()).await,
+            FauxResponseStep::Factory(factory) => {
+                factory(
+                    ctx.clone(),
+                    stream_opts.clone(),
+                    state_snap,
+                    request_model.clone(),
+                )
+                .await
+            }
         };
         let cloned = clone_message(resolved, &self.api, &self.provider_id, &request_model.id);
         let with_usage = with_usage_estimate(cloned, &ctx, stream_opts.as_ref(), &mut cache_snap);
@@ -777,7 +885,9 @@ impl FauxCore {
         tokio::spawn(async move {
             let res: Result<(), ()> = async {
                 if let Some(step) = step {
-                    let resolved = this.resolve_response(step, context, options, model.clone()).await;
+                    let resolved = this
+                        .resolve_response(step, context, options, model.clone())
+                        .await;
                     stream_with_deltas(
                         &stream_clone,
                         resolved,
@@ -809,7 +919,8 @@ impl FauxCore {
                     stream_clone.end(Some(msg));
                 }
                 Ok(())
-            }.await;
+            }
+            .await;
             if res.is_err() {
                 // ignored — end already called inside, or caller will see Error event
             }
@@ -831,12 +942,35 @@ impl FauxProvider {
         struct FauxApiKeyAuth;
         #[async_trait::async_trait]
         impl ApiKeyAuth for FauxApiKeyAuth {
-            fn name(&self) -> &str { "Faux" }
-            async fn login(&self, _: &(dyn AuthInteraction + Send + Sync)) -> anyhow::Result<ApiKeyCredential> {
-                Ok(ApiKeyCredential { r#type: "api_key".into(), key: Some("faux-api-key".into()), env: None })
+            fn name(&self) -> &str {
+                "Faux"
             }
-            async fn check(&self, _: &(dyn AuthContext + Send + Sync), _: Option<&ApiKeyCredential>, _: &CancellationToken) -> Option<AuthCheck> { None }
-            async fn resolve(&self, _: &(dyn AuthContext + Send + Sync), _: Option<&ApiKeyCredential>, _: &CancellationToken) -> Option<AuthResult> { None }
+            async fn login(
+                &self,
+                _: &(dyn AuthInteraction + Send + Sync),
+            ) -> anyhow::Result<ApiKeyCredential> {
+                Ok(ApiKeyCredential {
+                    r#type: "api_key".into(),
+                    key: Some("faux-api-key".into()),
+                    env: None,
+                })
+            }
+            async fn check(
+                &self,
+                _: &(dyn AuthContext + Send + Sync),
+                _: Option<&ApiKeyCredential>,
+                _: &CancellationToken,
+            ) -> Option<AuthCheck> {
+                None
+            }
+            async fn resolve(
+                &self,
+                _: &(dyn AuthContext + Send + Sync),
+                _: Option<&ApiKeyCredential>,
+                _: &CancellationToken,
+            ) -> Option<AuthResult> {
+                None
+            }
         }
         ProviderAuth {
             api_key: Some(Box::new(FauxApiKeyAuth)),

@@ -50,17 +50,17 @@
 //! # }
 //! ```
 
-pub mod types;
+pub mod auth;
 pub mod models;
 pub mod models_store;
-pub mod auth;
 pub mod providers;
+pub mod types;
 pub mod utils;
 
 // Re-exports from types
 pub use types::{
     content_text, uuidv7, Api, ApiStreamOptions, AssistantMessage, AssistantMessageEvent,
-    CancellationToken, Context, ContentBlock, ImageContent, JsonSchemaFormat, KnownApi, Message,
+    CancellationToken, ContentBlock, Context, ImageContent, JsonSchemaFormat, KnownApi, Message,
     Model, ModelCostRates, ModelThinkingLevel, ProviderEnv, ProviderHeaders, ProviderId,
     ProviderRequestOptions, ResponseFormat, SimpleStreamOptions, Tool, ToolChoice, Usage,
     UsageCost,
@@ -81,14 +81,14 @@ pub use auth::{
 // Re-exports from utils
 pub use utils::{
     calculate_usage_cost, create_assistant_message_event_stream, parse_partial_json,
-    string_enum_schema, tool_from_schema, validate_tool_arguments, with_retry, EventStream,
-    AssistantMessageEventStream, RetryConfig,
+    string_enum_schema, tool_from_schema, validate_tool_arguments, with_retry,
+    AssistantMessageEventStream, EventStream, RetryConfig,
 };
 
 // Re-export schemars for schema generation (replaces TypeBox from TS)
 pub use schemars;
-pub use schemars::JsonSchema;
 pub use schemars::schema_for;
+pub use schemars::JsonSchema;
 
 // Re-export serde_json for Value
 pub use serde_json;

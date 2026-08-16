@@ -27,10 +27,7 @@ impl CredentialStore for InMemoryCredentialStore {
         Ok(self.inner.lock().get(provider_id).cloned())
     }
 
-    async fn list(
-        &self,
-        _options: AuthOperationOptions,
-    ) -> anyhow::Result<Vec<CredentialInfo>> {
+    async fn list(&self, _options: AuthOperationOptions) -> anyhow::Result<Vec<CredentialInfo>> {
         let store = self.inner.lock();
         Ok(store
             .iter()

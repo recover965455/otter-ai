@@ -6,12 +6,12 @@ use parking_lot::RwLock;
 
 use crate::auth::context::DefaultAuthContext;
 use crate::auth::context::InMemoryCredentialStore;
-use crate::auth::{resolve_provider_auth, AuthResolutionOverrides, ModelsError};
 use crate::auth::types::{AuthContext, CredentialStore};
+use crate::auth::{resolve_provider_auth, AuthResolutionOverrides, ModelsError};
 use crate::models_store::{InMemoryModelsStore, ModelsStore};
 use crate::providers::{Provider, RefreshContext, RefreshCtxState};
 use crate::types::{
-    ApiStreamOptions, AssistantMessage, AssistantMessageEvent, Context, CancellationToken, Model,
+    ApiStreamOptions, AssistantMessage, AssistantMessageEvent, CancellationToken, Context, Model,
     SimpleStreamOptions,
 };
 
@@ -42,26 +42,17 @@ impl Models {
         }
     }
 
-    pub fn with_credential_store(
-        mut self,
-        store: Arc<dyn CredentialStore + Send + Sync>,
-    ) -> Self {
+    pub fn with_credential_store(mut self, store: Arc<dyn CredentialStore + Send + Sync>) -> Self {
         self.credential_store = store;
         self
     }
 
-    pub fn with_auth_context(
-        mut self,
-        ctx: Arc<dyn AuthContext + Send + Sync>,
-    ) -> Self {
+    pub fn with_auth_context(mut self, ctx: Arc<dyn AuthContext + Send + Sync>) -> Self {
         self.auth_context = ctx;
         self
     }
 
-    pub fn with_models_store(
-        mut self,
-        store: Arc<dyn ModelsStore + Send + Sync>,
-    ) -> Self {
+    pub fn with_models_store(mut self, store: Arc<dyn ModelsStore + Send + Sync>) -> Self {
         self.models_store = store;
         self
     }
@@ -108,7 +99,10 @@ impl Models {
         let stored = self.models_store.read(provider_id).await.unwrap_or(None);
         let credential = self
             .credential_store
-            .read(provider_id, crate::auth::types::AuthOperationOptions::default())
+            .read(
+                provider_id,
+                crate::auth::types::AuthOperationOptions::default(),
+            )
             .await
             .unwrap_or(None);
 
@@ -124,7 +118,9 @@ impl Models {
             state: std::borrow::Cow::Owned(refresh_ctx_state),
         };
 
-        provider.refresh_models(Box::new(refresh_ctx)).await
+        provider
+            .refresh_models(Box::new(refresh_ctx))
+            .await
             .map_err(|e| anyhow::anyhow!(e))?;
 
         let models = provider.get_models();
@@ -175,7 +171,13 @@ impl Models {
                 .get(pid)
                 .cloned()
                 .unwrap_or_default(),
-            None => self.provider_models.read().values().flatten().cloned().collect(),
+            None => self
+                .provider_models
+                .read()
+                .values()
+                .flatten()
+                .cloned()
+                .collect(),
         }
     }
 
@@ -192,15 +194,13 @@ impl Models {
         provider_id: &str,
         overrides: AuthResolutionOverrides,
     ) -> Result<crate::auth::types::AuthResult, ModelsError> {
-        let provider = self
-            .get_provider(provider_id)
-            .ok_or_else(|| ModelsError {
-                code: crate::auth::ModelsErrorCode::NotFound(format!(
-                    "Provider {} not found",
-                    provider_id
-                )),
-                source: None,
-            })?;
+        let provider = self.get_provider(provider_id).ok_or_else(|| ModelsError {
+            code: crate::auth::ModelsErrorCode::NotFound(format!(
+                "Provider {} not found",
+                provider_id
+            )),
+            source: None,
+        })?;
         let signal = CancellationToken::new();
         resolve_provider_auth(
             provider.as_ref(),
@@ -217,9 +217,8 @@ impl Models {
         model: &Model,
         mut context: Context,
         options: SimpleStreamOptions,
-    ) -> std::pin::Pin<
-        Box<dyn futures::Stream<Item = AssistantMessageEvent> + Send + 'static>,
-    > {
+    ) -> std::pin::Pin<Box<dyn futures::Stream<Item = AssistantMessageEvent> + Send + 'static>>
+    {
         let provider_id = model.provider_id.clone();
         let model = model.clone();
         let me = self.clone_ref();
@@ -335,7 +334,9 @@ impl Models {
             } else if let Some(err) = last_error {
                 Err(anyhow::anyhow!("{}", err))
             } else {
-                Err(anyhow::anyhow!("Stream completed without Done or Error event"))
+                Err(anyhow::anyhow!(
+                    "Stream completed without Done or Error event"
+                ))
             }
         })
     }

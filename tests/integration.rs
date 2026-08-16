@@ -9,11 +9,11 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
+use otter_ai::auth::types::ModifyFn;
 use otter_ai::auth::{
     ApiKeyCredential, AuthOperationOptions, Credential, CredentialStore, InMemoryCredentialStore,
     OAuthCredential, OAuthCredentials,
 };
-use otter_ai::auth::types::ModifyFn;
 use otter_ai::providers::faux::*;
 use otter_ai::types::*;
 use otter_ai::*;
@@ -116,14 +116,17 @@ mod faux_provider {
     #[tokio::test]
     async fn registers_a_custom_provider_and_estimates_usage() {
         let registration = register_faux_provider(None);
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message("hello world", FauxAssistantMessageOptions::default()),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "hello world",
+            FauxAssistantMessageOptions::default(),
+        ))]);
 
         let context = Context {
             system_prompt: Some("Be concise.".into()),
             messages: vec![Message::User {
-                content: vec![ContentBlock::Text { text: "hi there".into() }],
+                content: vec![ContentBlock::Text {
+                    text: "hi there".into(),
+                }],
                 timestamp: 0,
             }],
             ..Default::default()
@@ -151,30 +154,30 @@ mod faux_provider {
     #[tokio::test]
     async fn supports_helper_blocks_for_text_thinking_and_tool_calls() {
         let registration = register_faux_provider(None);
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message(
-                vec![
-                    faux_thinking("think"),
-                    faux_tool_call(
-                        "echo",
-                        json!({ "text": "hi" }),
-                        FauxToolCallOptions::default(),
-                    ),
-                    faux_text("done"),
-                ],
-                FauxAssistantMessageOptions {
-                    stop_reason: Some("toolUse".into()),
-                    ..Default::default()
-                },
-            ),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            vec![
+                faux_thinking("think"),
+                faux_tool_call(
+                    "echo",
+                    json!({ "text": "hi" }),
+                    FauxToolCallOptions::default(),
+                ),
+                faux_text("done"),
+            ],
+            FauxAssistantMessageOptions {
+                stop_reason: Some("toolUse".into()),
+                ..Default::default()
+            },
+        ))]);
 
         let response = complete(&registration, user_context("hi"), None)
             .await
             .unwrap();
         match &response {
             Message::Assistant {
-                content, stop_reason, ..
+                content,
+                stop_reason,
+                ..
             } => {
                 assert_eq!(content.len(), 3);
                 assert!(matches!(
@@ -235,10 +238,12 @@ mod faux_provider {
         assert_eq!(default_model.id, "faux-fast");
 
         assert!(!registration.get_model(Some("faux-fast")).unwrap().reasoning);
-        assert!(registration
-            .get_model(Some("faux-thinker"))
-            .unwrap()
-            .reasoning);
+        assert!(
+            registration
+                .get_model(Some("faux-thinker"))
+                .unwrap()
+                .reasoning
+        );
 
         let fast_model = registration.get_model(Some("faux-fast")).unwrap();
         let thinker_model = registration.get_model(Some("faux-thinker")).unwrap();
@@ -282,9 +287,10 @@ mod faux_provider {
             }],
             ..Default::default()
         }));
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message("hello", FauxAssistantMessageOptions::default()),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "hello",
+            FauxAssistantMessageOptions::default(),
+        ))]);
 
         let response = complete(&registration, user_context("hi"), None)
             .await
@@ -320,23 +326,31 @@ mod faux_provider {
 
         let context = user_context("hi");
 
-        let first = complete(&registration, context.clone(), None).await.unwrap();
+        let first = complete(&registration, context.clone(), None)
+            .await
+            .unwrap();
         match &first {
             Message::Assistant { content, .. } => {
                 assert_eq!(
                     content,
-                    &vec![ContentBlock::Text { text: "first".into() }]
+                    &vec![ContentBlock::Text {
+                        text: "first".into()
+                    }]
                 );
             }
             _ => panic!("expected assistant message"),
         }
 
-        let second = complete(&registration, context.clone(), None).await.unwrap();
+        let second = complete(&registration, context.clone(), None)
+            .await
+            .unwrap();
         match &second {
             Message::Assistant { content, .. } => {
                 assert_eq!(
                     content,
-                    &vec![ContentBlock::Text { text: "second".into() }]
+                    &vec![ContentBlock::Text {
+                        text: "second".into()
+                    }]
                 );
             }
             _ => panic!("expected assistant message"),
@@ -360,35 +374,45 @@ mod faux_provider {
     #[tokio::test]
     async fn can_replace_and_append_queued_responses() {
         let registration = register_faux_provider(None);
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message("first", FauxAssistantMessageOptions::default()),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "first",
+            FauxAssistantMessageOptions::default(),
+        ))]);
 
         let context = user_context("hi");
 
-        let r1 = complete(&registration, context.clone(), None).await.unwrap();
+        let r1 = complete(&registration, context.clone(), None)
+            .await
+            .unwrap();
         match &r1 {
             Message::Assistant { content, .. } => {
                 assert_eq!(
                     content,
-                    &vec![ContentBlock::Text { text: "first".into() }]
+                    &vec![ContentBlock::Text {
+                        text: "first".into()
+                    }]
                 );
             }
             _ => panic!("expected assistant"),
         }
         assert_eq!(registration.get_pending_response_count(), 0);
 
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message("second", FauxAssistantMessageOptions::default()),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "second",
+            FauxAssistantMessageOptions::default(),
+        ))]);
         assert_eq!(registration.get_pending_response_count(), 1);
 
-        let r2 = complete(&registration, context.clone(), None).await.unwrap();
+        let r2 = complete(&registration, context.clone(), None)
+            .await
+            .unwrap();
         match &r2 {
             Message::Assistant { content, .. } => {
                 assert_eq!(
                     content,
-                    &vec![ContentBlock::Text { text: "second".into() }]
+                    &vec![ContentBlock::Text {
+                        text: "second".into()
+                    }]
                 );
             }
             _ => panic!("expected assistant"),
@@ -406,12 +430,16 @@ mod faux_provider {
         ]);
         assert_eq!(registration.get_pending_response_count(), 2);
 
-        let r3 = complete(&registration, context.clone(), None).await.unwrap();
+        let r3 = complete(&registration, context.clone(), None)
+            .await
+            .unwrap();
         match &r3 {
             Message::Assistant { content, .. } => {
                 assert_eq!(
                     content,
-                    &vec![ContentBlock::Text { text: "third".into() }]
+                    &vec![ContentBlock::Text {
+                        text: "third".into()
+                    }]
                 );
             }
             _ => panic!("expected assistant"),
@@ -422,7 +450,9 @@ mod faux_provider {
             Message::Assistant { content, .. } => {
                 assert_eq!(
                     content,
-                    &vec![ContentBlock::Text { text: "fourth".into() }]
+                    &vec![ContentBlock::Text {
+                        text: "fourth".into()
+                    }]
                 );
             }
             _ => panic!("expected assistant"),
@@ -449,10 +479,7 @@ mod faux_provider {
             .unwrap();
         match &response {
             Message::Assistant { content, .. } => {
-                assert_eq!(
-                    content,
-                    &vec![ContentBlock::Text { text: "1:1".into() }]
-                );
+                assert_eq!(content, &vec![ContentBlock::Text { text: "1:1".into() }]);
             }
             _ => panic!("expected assistant message"),
         }
@@ -509,24 +536,19 @@ mod faux_provider {
     #[tokio::test]
     async fn rejects_a_queued_response_without_a_terminal_stop_reason() {
         let registration = register_faux_provider(None);
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message(
-                "partial",
-                FauxAssistantMessageOptions {
-                    stop_reason: Some("pending".into()),
-                    ..Default::default()
-                },
-            ),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "partial",
+            FauxAssistantMessageOptions {
+                stop_reason: Some("pending".into()),
+                ..Default::default()
+            },
+        ))]);
 
-        let events =
-            collect_events(stream(&registration, user_context("hi"), None)).await;
+        let events = collect_events(stream(&registration, user_context("hi"), None)).await;
 
         // No "done" event should be emitted.
         assert!(
-            !events
-                .iter()
-                .any(|e| event_type(e) == "done"),
+            !events.iter().any(|e| event_type(e) == "done"),
             "should not contain a done event"
         );
 
@@ -542,9 +564,10 @@ mod faux_provider {
     #[tokio::test]
     async fn estimates_prompt_and_output_tokens_from_serialized_context() {
         let registration = register_faux_provider(None);
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message("done", FauxAssistantMessageOptions::default()),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "done",
+            FauxAssistantMessageOptions::default(),
+        ))]);
 
         let tool = Tool {
             name: "echo".into(),
@@ -561,7 +584,9 @@ mod faux_provider {
             messages: vec![
                 Message::User {
                     content: vec![
-                        ContentBlock::Text { text: "hello".into() },
+                        ContentBlock::Text {
+                            text: "hello".into(),
+                        },
                         ContentBlock::Image(ImageContent {
                             content_type: "image".into(),
                             data: "abcd".into(),
@@ -574,7 +599,9 @@ mod faux_provider {
                 Message::ToolResult {
                     tool_call_id: "tool-1".into(),
                     tool_name: "echo".into(),
-                    content: vec![ContentBlock::Text { text: "tool out".into() }],
+                    content: vec![ContentBlock::Text {
+                        text: "tool out".into(),
+                    }],
                     is_error: false,
                     timestamp: 2,
                 },
@@ -635,7 +662,9 @@ mod faux_provider {
 
         context.messages.push(first);
         context.messages.push(Message::User {
-            content: vec![ContentBlock::Text { text: "follow up".into() }],
+            content: vec![ContentBlock::Text {
+                text: "follow up".into(),
+            }],
             timestamp: 1,
         });
 
@@ -674,7 +703,9 @@ mod faux_provider {
         let mut context = Context {
             system_prompt: Some("Be concise.".into()),
             messages: vec![Message::User {
-                content: vec![ContentBlock::Text { text: "hello".into() }],
+                content: vec![ContentBlock::Text {
+                    text: "hello".into(),
+                }],
                 timestamp: 0,
             }],
             ..Default::default()
@@ -695,7 +726,9 @@ mod faux_provider {
 
         context.messages.push(first);
         context.messages.push(Message::User {
-            content: vec![ContentBlock::Text { text: "follow up".into() }],
+            content: vec![ContentBlock::Text {
+                text: "follow up".into(),
+            }],
             timestamp: 1,
         });
 
@@ -737,7 +770,9 @@ mod faux_provider {
             FauxAssistantMessageOptions::default(),
         ));
         context.messages.push(Message::User {
-            content: vec![ContentBlock::Text { text: "follow up".into() }],
+            content: vec![ContentBlock::Text {
+                text: "follow up".into(),
+            }],
             timestamp: 1,
         });
 
@@ -750,25 +785,23 @@ mod faux_provider {
     #[tokio::test]
     async fn streams_thinking_text_and_partial_tool_call_deltas() {
         let registration = register_faux_provider(None);
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message(
-                vec![
-                    faux_thinking("thinking text"),
-                    faux_text("answer text"),
-                    faux_tool_call(
-                        "echo",
-                        json!({ "text": "hi", "count": 12 }),
-                        FauxToolCallOptions {
-                            id: Some("tool-1".into()),
-                        },
-                    ),
-                ],
-                FauxAssistantMessageOptions {
-                    stop_reason: Some("toolUse".into()),
-                    ..Default::default()
-                },
-            ),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            vec![
+                faux_thinking("thinking text"),
+                faux_text("answer text"),
+                faux_tool_call(
+                    "echo",
+                    json!({ "text": "hi", "count": 12 }),
+                    FauxToolCallOptions {
+                        id: Some("tool-1".into()),
+                    },
+                ),
+            ],
+            FauxAssistantMessageOptions {
+                stop_reason: Some("toolUse".into()),
+                ..Default::default()
+            },
+        ))]);
 
         let mut event_types = Vec::new();
         let mut toolcall_deltas: Vec<String> = Vec::new();
@@ -801,28 +834,25 @@ mod faux_provider {
             token_size: Some((1, 1)),
             ..Default::default()
         }));
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message(
-                vec![
-                    faux_thinking("go"),
-                    faux_text("ok"),
-                    faux_tool_call(
-                        "echo",
-                        json!({}),
-                        FauxToolCallOptions {
-                            id: Some("tool-1".into()),
-                        },
-                    ),
-                ],
-                FauxAssistantMessageOptions {
-                    stop_reason: Some("toolUse".into()),
-                    ..Default::default()
-                },
-            ),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            vec![
+                faux_thinking("go"),
+                faux_text("ok"),
+                faux_tool_call(
+                    "echo",
+                    json!({}),
+                    FauxToolCallOptions {
+                        id: Some("tool-1".into()),
+                    },
+                ),
+            ],
+            FauxAssistantMessageOptions {
+                stop_reason: Some("toolUse".into()),
+                ..Default::default()
+            },
+        ))]);
 
-        let events =
-            collect_events(stream(&registration, user_context("hi"), None)).await;
+        let events = collect_events(stream(&registration, user_context("hi"), None)).await;
         let types: Vec<&str> = events.iter().map(event_type).collect();
 
         // Rust emits a "usage" event before "done" (the TS version does not).
@@ -848,33 +878,30 @@ mod faux_provider {
     #[tokio::test]
     async fn streams_multiple_tool_calls_in_one_message() {
         let registration = register_faux_provider(None);
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message(
-                vec![
-                    faux_tool_call(
-                        "echo",
-                        json!({ "text": "one" }),
-                        FauxToolCallOptions {
-                            id: Some("tool-1".into()),
-                        },
-                    ),
-                    faux_tool_call(
-                        "echo",
-                        json!({ "text": "two" }),
-                        FauxToolCallOptions {
-                            id: Some("tool-2".into()),
-                        },
-                    ),
-                ],
-                FauxAssistantMessageOptions {
-                    stop_reason: Some("toolUse".into()),
-                    ..Default::default()
-                },
-            ),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            vec![
+                faux_tool_call(
+                    "echo",
+                    json!({ "text": "one" }),
+                    FauxToolCallOptions {
+                        id: Some("tool-1".into()),
+                    },
+                ),
+                faux_tool_call(
+                    "echo",
+                    json!({ "text": "two" }),
+                    FauxToolCallOptions {
+                        id: Some("tool-2".into()),
+                    },
+                ),
+            ],
+            FauxAssistantMessageOptions {
+                stop_reason: Some("toolUse".into()),
+                ..Default::default()
+            },
+        ))]);
 
-        let events =
-            collect_events(stream(&registration, user_context("hi"), None)).await;
+        let events = collect_events(stream(&registration, user_context("hi"), None)).await;
 
         let start_count = events
             .iter()
@@ -894,19 +921,16 @@ mod faux_provider {
             token_size: Some((2, 2)),
             ..Default::default()
         }));
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message(
-                "partial",
-                FauxAssistantMessageOptions {
-                    stop_reason: Some("error".into()),
-                    error_message: Some("upstream failed".into()),
-                    ..Default::default()
-                },
-            ),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "partial",
+            FauxAssistantMessageOptions {
+                stop_reason: Some("error".into()),
+                error_message: Some("upstream failed".into()),
+                ..Default::default()
+            },
+        ))]);
 
-        let events =
-            collect_events(stream(&registration, user_context("hi"), None)).await;
+        let events = collect_events(stream(&registration, user_context("hi"), None)).await;
         let types: Vec<&str> = events.iter().map(event_type).collect();
 
         assert_eq!(
@@ -927,19 +951,16 @@ mod faux_provider {
             token_size: Some((2, 2)),
             ..Default::default()
         }));
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message(
-                "partial",
-                FauxAssistantMessageOptions {
-                    stop_reason: Some("aborted".into()),
-                    error_message: Some("Request was aborted".into()),
-                    ..Default::default()
-                },
-            ),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "partial",
+            FauxAssistantMessageOptions {
+                stop_reason: Some("aborted".into()),
+                error_message: Some("Request was aborted".into()),
+                ..Default::default()
+            },
+        ))]);
 
-        let events =
-            collect_events(stream(&registration, user_context("hi"), None)).await;
+        let events = collect_events(stream(&registration, user_context("hi"), None)).await;
         let types: Vec<&str> = events.iter().map(event_type).collect();
 
         assert_eq!(
@@ -961,12 +982,10 @@ mod faux_provider {
             token_size: Some((3, 3)),
             ..Default::default()
         }));
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message(
-                "abcdefghijklmnopqrstuvwxyz",
-                FauxAssistantMessageOptions::default(),
-            ),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "abcdefghijklmnopqrstuvwxyz",
+            FauxAssistantMessageOptions::default(),
+        ))]);
 
         let token = CancellationToken::new();
         token.cancel();
@@ -997,12 +1016,10 @@ mod faux_provider {
             token_size: Some((3, 3)),
             ..Default::default()
         }));
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message(
-                "abcdefghijklmnopqrstuvwxyz",
-                FauxAssistantMessageOptions::default(),
-            ),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "abcdefghijklmnopqrstuvwxyz",
+            FauxAssistantMessageOptions::default(),
+        ))]);
 
         let token = CancellationToken::new();
         let mut event_types = Vec::new();
@@ -1039,12 +1056,10 @@ mod faux_provider {
             token_size: Some((3, 3)),
             ..Default::default()
         }));
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message(
-                vec![faux_thinking("abcdefghijklmnopqrstuvwxyz")],
-                FauxAssistantMessageOptions::default(),
-            ),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            vec![faux_thinking("abcdefghijklmnopqrstuvwxyz")],
+            FauxAssistantMessageOptions::default(),
+        ))]);
 
         let token = CancellationToken::new();
         let mut event_types = Vec::new();
@@ -1081,21 +1096,19 @@ mod faux_provider {
             token_size: Some((3, 3)),
             ..Default::default()
         }));
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message(
-                vec![faux_tool_call(
-                    "echo",
-                    json!({ "text": "abcdefghijklmnopqrstuvwxyz", "count": 123456789 }),
-                    FauxToolCallOptions {
-                        id: Some("tool-1".into()),
-                    },
-                )],
-                FauxAssistantMessageOptions {
-                    stop_reason: Some("toolUse".into()),
-                    ..Default::default()
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            vec![faux_tool_call(
+                "echo",
+                json!({ "text": "abcdefghijklmnopqrstuvwxyz", "count": 123456789 }),
+                FauxToolCallOptions {
+                    id: Some("tool-1".into()),
                 },
-            ),
-        )]);
+            )],
+            FauxAssistantMessageOptions {
+                stop_reason: Some("toolUse".into()),
+                ..Default::default()
+            },
+        ))]);
 
         let token = CancellationToken::new();
         let mut event_types = Vec::new();
@@ -1131,9 +1144,10 @@ mod faux_provider {
         // Subsequent complete() calls return an error message with
         // stop_reason="error" and error_message="No more faux responses queued".
         let registration = register_faux_provider(None);
-        registration.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message("hello", FauxAssistantMessageOptions::default()),
-        )]);
+        registration.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "hello",
+            FauxAssistantMessageOptions::default(),
+        ))]);
         registration.unregister();
 
         let result = complete(&registration, user_context("hi"), None).await;
@@ -1156,8 +1170,8 @@ mod faux_provider {
 // ===========================================================================
 
 mod validation {
-    use otter_ai::utils::validation::validate_tool_arguments;
     use otter_ai::types::Tool;
+    use otter_ai::utils::validation::validate_tool_arguments;
     use serde_json::json;
 
     fn make_tool(parameters: serde_json::Value) -> Tool {
@@ -1168,7 +1182,10 @@ mod validation {
         }
     }
 
-    fn make_tool_with_value_schema(schema: serde_json::Value, value: serde_json::Value) -> (Tool, serde_json::Value) {
+    fn make_tool_with_value_schema(
+        schema: serde_json::Value,
+        value: serde_json::Value,
+    ) -> (Tool, serde_json::Value) {
         let tool = make_tool(json!({
             "type": "object",
             "properties": { "value": schema },
@@ -1215,7 +1232,13 @@ mod validation {
         for (schema, input, expected) in cases {
             let (tool, args) = make_tool_with_value_schema(schema.clone(), input.clone());
             let result = validate_tool_arguments(&tool, &args).unwrap();
-            assert_eq!(result, json!({ "value": expected }), "schema: {:?}, input: {:?}", schema, input);
+            assert_eq!(
+                result,
+                json!({ "value": expected }),
+                "schema: {:?}, input: {:?}",
+                schema,
+                input
+            );
         }
     }
 
@@ -1238,11 +1261,14 @@ mod validation {
             "metadata": { "enabled": null }
         });
         let result = validate_tool_arguments(&tool, &args).unwrap();
-        assert_eq!(result, json!({
-            "path": "file.txt",
-            "nullable": null,
-            "metadata": {}
-        }));
+        assert_eq!(
+            result,
+            json!({
+                "path": "file.txt",
+                "nullable": null,
+                "metadata": {}
+            })
+        );
     }
 
     #[test]
@@ -1317,7 +1343,12 @@ mod validation {
         for (schema, input) in failing_cases {
             let (tool, args) = make_tool_with_value_schema(schema.clone(), input.clone());
             let result = validate_tool_arguments(&tool, &args);
-            assert!(result.is_err(), "should reject: schema={:?}, input={:?}", schema, input);
+            assert!(
+                result.is_err(),
+                "should reject: schema={:?}, input={:?}",
+                schema,
+                input
+            );
             assert!(result.unwrap_err().contains("Validation failed"));
         }
     }
@@ -1414,8 +1445,11 @@ mod models_runtime {
         models.set_provider_arc(h1.provider.clone());
         models.set_provider_arc(h2.provider.clone());
 
-        let provider_ids: Vec<String> =
-            models.list_providers().into_iter().map(|(id, _)| id).collect();
+        let provider_ids: Vec<String> = models
+            .list_providers()
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
         assert!(provider_ids.contains(&"p1".to_string()));
         assert!(provider_ids.contains(&"p2".to_string()));
 
@@ -1468,8 +1502,11 @@ mod models_runtime {
         models.set_provider_arc(h2.provider.clone());
         models.refresh_all(false, true).await.unwrap();
 
-        let all_ids: Vec<String> =
-            models.list_models(None).iter().map(|m| m.id.clone()).collect();
+        let all_ids: Vec<String> = models
+            .list_models(None)
+            .iter()
+            .map(|m| m.id.clone())
+            .collect();
         assert!(all_ids.contains(&"m1".to_string()));
         assert!(all_ids.contains(&"m2".to_string()));
         assert!(all_ids.contains(&"m3".to_string()));
@@ -1522,12 +1559,15 @@ mod models_runtime {
             }],
             ..Default::default()
         }));
-        handle.set_responses(vec![FauxResponseStep::Message(
-            faux_assistant_message("ok", FauxAssistantMessageOptions::default()),
-        )]);
+        handle.set_responses(vec![FauxResponseStep::Message(faux_assistant_message(
+            "ok",
+            FauxAssistantMessageOptions::default(),
+        ))]);
         models.set_provider_arc(handle.provider.clone());
         models.refresh_all(false, true).await.unwrap();
-        let model = models.get_model("p1", "model-a").expect("model-a should exist");
+        let model = models
+            .get_model("p1", "model-a")
+            .expect("model-a should exist");
 
         let ctx = user_context("hi");
         let mut stream = models.stream(&model, ctx, SimpleStreamOptions::default());
@@ -1580,7 +1620,11 @@ mod models_runtime {
             })
         });
         credentials
-            .modify_fn("oauth-provider", oauth_modify, AuthOperationOptions::default())
+            .modify_fn(
+                "oauth-provider",
+                oauth_modify,
+                AuthOperationOptions::default(),
+            )
             .await
             .unwrap();
 
@@ -1626,11 +1670,13 @@ mod models_runtime {
         }));
         models.set_provider_arc(ok.provider.clone());
         // Only refresh the healthy provider; "broken" is left with an empty cache.
-        models.refresh_provider_models("ok", false, true).await.unwrap();
+        models
+            .refresh_provider_models("ok", false, true)
+            .await
+            .unwrap();
 
         // all-provider listing only includes the "ok" provider's model
-        let all_ids: Vec<String> =
-            models.list_models(None).into_iter().map(|m| m.id).collect();
+        let all_ids: Vec<String> = models.list_models(None).into_iter().map(|m| m.id).collect();
         assert_eq!(all_ids, vec!["m1".to_string()]);
 
         // single-provider listing for the broken provider returns empty
@@ -1659,7 +1705,9 @@ mod models_runtime {
 
     #[tokio::test]
     #[ignore = "requires effective API-key credential passing and unconfigured provider skipping"]
-    async fn passes_effective_api_key_credentials_and_refresh_options_while_skipping_unconfigured_providers() {}
+    async fn passes_effective_api_key_credentials_and_refresh_options_while_skipping_unconfigured_providers(
+    ) {
+    }
 
     #[tokio::test]
     #[ignore = "requires expired OAuth refresh before model refresh"]
@@ -1782,83 +1830,206 @@ mod abort {
     }
 
     // Google Provider
-    ignored_abort_test!(google_should_abort_mid_stream, "Google Provider should abort mid-stream");
-    ignored_abort_test!(google_should_handle_immediate_abort, "Google Provider should handle immediate abort");
+    ignored_abort_test!(
+        google_should_abort_mid_stream,
+        "Google Provider should abort mid-stream"
+    );
+    ignored_abort_test!(
+        google_should_handle_immediate_abort,
+        "Google Provider should handle immediate abort"
+    );
 
     // OpenAI Completions Provider
-    ignored_abort_test!(openai_completions_should_abort_mid_stream, "OpenAI Completions Provider should abort mid-stream");
-    ignored_abort_test!(openai_completions_should_handle_immediate_abort, "OpenAI Completions Provider should handle immediate abort");
+    ignored_abort_test!(
+        openai_completions_should_abort_mid_stream,
+        "OpenAI Completions Provider should abort mid-stream"
+    );
+    ignored_abort_test!(
+        openai_completions_should_handle_immediate_abort,
+        "OpenAI Completions Provider should handle immediate abort"
+    );
 
     // OpenAI Responses Provider
-    ignored_abort_test!(openai_responses_should_abort_mid_stream, "OpenAI Responses Provider should abort mid-stream");
-    ignored_abort_test!(openai_responses_should_handle_immediate_abort, "OpenAI Responses Provider should handle immediate abort");
+    ignored_abort_test!(
+        openai_responses_should_abort_mid_stream,
+        "OpenAI Responses Provider should abort mid-stream"
+    );
+    ignored_abort_test!(
+        openai_responses_should_handle_immediate_abort,
+        "OpenAI Responses Provider should handle immediate abort"
+    );
 
     // Azure OpenAI Responses Provider
-    ignored_abort_test!(azure_openai_responses_should_abort_mid_stream, "Azure OpenAI Responses Provider should abort mid-stream");
-    ignored_abort_test!(azure_openai_responses_should_handle_immediate_abort, "Azure OpenAI Responses Provider should handle immediate abort");
+    ignored_abort_test!(
+        azure_openai_responses_should_abort_mid_stream,
+        "Azure OpenAI Responses Provider should abort mid-stream"
+    );
+    ignored_abort_test!(
+        azure_openai_responses_should_handle_immediate_abort,
+        "Azure OpenAI Responses Provider should handle immediate abort"
+    );
 
     // Anthropic Provider
-    ignored_abort_test!(anthropic_should_abort_mid_stream, "Anthropic Provider should abort mid-stream");
-    ignored_abort_test!(anthropic_should_handle_immediate_abort, "Anthropic Provider should handle immediate abort");
+    ignored_abort_test!(
+        anthropic_should_abort_mid_stream,
+        "Anthropic Provider should abort mid-stream"
+    );
+    ignored_abort_test!(
+        anthropic_should_handle_immediate_abort,
+        "Anthropic Provider should handle immediate abort"
+    );
 
     // Mistral Provider
-    ignored_abort_test!(mistral_should_abort_mid_stream, "Mistral Provider should abort mid-stream");
-    ignored_abort_test!(mistral_should_handle_immediate_abort, "Mistral Provider should handle immediate abort");
+    ignored_abort_test!(
+        mistral_should_abort_mid_stream,
+        "Mistral Provider should abort mid-stream"
+    );
+    ignored_abort_test!(
+        mistral_should_handle_immediate_abort,
+        "Mistral Provider should handle immediate abort"
+    );
 
     // Together AI Provider
-    ignored_abort_test!(together_ai_should_abort_mid_stream, "Together AI Provider should abort mid-stream");
-    ignored_abort_test!(together_ai_should_handle_immediate_abort, "Together AI Provider should handle immediate abort");
+    ignored_abort_test!(
+        together_ai_should_abort_mid_stream,
+        "Together AI Provider should abort mid-stream"
+    );
+    ignored_abort_test!(
+        together_ai_should_handle_immediate_abort,
+        "Together AI Provider should handle immediate abort"
+    );
 
     // Baseten Provider
-    ignored_abort_test!(baseten_should_abort_mid_stream, "Baseten Provider should abort mid-stream");
-    ignored_abort_test!(baseten_should_handle_immediate_abort, "Baseten Provider should handle immediate abort");
+    ignored_abort_test!(
+        baseten_should_abort_mid_stream,
+        "Baseten Provider should abort mid-stream"
+    );
+    ignored_abort_test!(
+        baseten_should_handle_immediate_abort,
+        "Baseten Provider should handle immediate abort"
+    );
 
     // MiniMax Provider
-    ignored_abort_test!(minimax_should_abort_mid_stream, "MiniMax Provider should abort mid-stream");
-    ignored_abort_test!(minimax_should_handle_immediate_abort, "MiniMax Provider should handle immediate abort");
+    ignored_abort_test!(
+        minimax_should_abort_mid_stream,
+        "MiniMax Provider should abort mid-stream"
+    );
+    ignored_abort_test!(
+        minimax_should_handle_immediate_abort,
+        "MiniMax Provider should handle immediate abort"
+    );
 
     // Xiaomi MiMo (API billing)
-    ignored_abort_test!(xiaomi_mimo_api_billing_should_abort_mid_stream, "Xiaomi MiMo (API billing) should abort mid-stream");
-    ignored_abort_test!(xiaomi_mimo_api_billing_should_handle_immediate_abort, "Xiaomi MiMo (API billing) should handle immediate abort");
+    ignored_abort_test!(
+        xiaomi_mimo_api_billing_should_abort_mid_stream,
+        "Xiaomi MiMo (API billing) should abort mid-stream"
+    );
+    ignored_abort_test!(
+        xiaomi_mimo_api_billing_should_handle_immediate_abort,
+        "Xiaomi MiMo (API billing) should handle immediate abort"
+    );
 
     // Xiaomi MiMo Token Plan (CN)
-    ignored_abort_test!(xiaomi_mimo_token_plan_cn_should_abort_mid_stream, "Xiaomi MiMo Token Plan (CN) should abort mid-stream");
-    ignored_abort_test!(xiaomi_mimo_token_plan_cn_should_handle_immediate_abort, "Xiaomi MiMo Token Plan (CN) should handle immediate abort");
+    ignored_abort_test!(
+        xiaomi_mimo_token_plan_cn_should_abort_mid_stream,
+        "Xiaomi MiMo Token Plan (CN) should abort mid-stream"
+    );
+    ignored_abort_test!(
+        xiaomi_mimo_token_plan_cn_should_handle_immediate_abort,
+        "Xiaomi MiMo Token Plan (CN) should handle immediate abort"
+    );
 
     // Xiaomi MiMo Token Plan (AMS)
-    ignored_abort_test!(xiaomi_mimo_token_plan_ams_should_abort_mid_stream, "Xiaomi MiMo Token Plan (AMS) should abort mid-stream");
-    ignored_abort_test!(xiaomi_mimo_token_plan_ams_should_handle_immediate_abort, "Xiaomi MiMo Token Plan (AMS) should handle immediate abort");
+    ignored_abort_test!(
+        xiaomi_mimo_token_plan_ams_should_abort_mid_stream,
+        "Xiaomi MiMo Token Plan (AMS) should abort mid-stream"
+    );
+    ignored_abort_test!(
+        xiaomi_mimo_token_plan_ams_should_handle_immediate_abort,
+        "Xiaomi MiMo Token Plan (AMS) should handle immediate abort"
+    );
 
     // Xiaomi MiMo Token Plan (SGP)
-    ignored_abort_test!(xiaomi_mimo_token_plan_sgp_should_abort_mid_stream, "Xiaomi MiMo Token Plan (SGP) should abort mid-stream");
-    ignored_abort_test!(xiaomi_mimo_token_plan_sgp_should_handle_immediate_abort, "Xiaomi MiMo Token Plan (SGP) should handle immediate abort");
+    ignored_abort_test!(
+        xiaomi_mimo_token_plan_sgp_should_abort_mid_stream,
+        "Xiaomi MiMo Token Plan (SGP) should abort mid-stream"
+    );
+    ignored_abort_test!(
+        xiaomi_mimo_token_plan_sgp_should_handle_immediate_abort,
+        "Xiaomi MiMo Token Plan (SGP) should handle immediate abort"
+    );
 
     // Qwen Token Plan
-    ignored_abort_test!(qwen_token_plan_should_abort_mid_stream, "Qwen Token Plan should abort mid-stream");
-    ignored_abort_test!(qwen_token_plan_should_handle_immediate_abort, "Qwen Token Plan should handle immediate abort");
+    ignored_abort_test!(
+        qwen_token_plan_should_abort_mid_stream,
+        "Qwen Token Plan should abort mid-stream"
+    );
+    ignored_abort_test!(
+        qwen_token_plan_should_handle_immediate_abort,
+        "Qwen Token Plan should handle immediate abort"
+    );
 
     // Qwen Token Plan Individual
-    ignored_abort_test!(qwen_token_plan_individual_should_abort_mid_stream, "Qwen Token Plan Individual should abort mid-stream");
-    ignored_abort_test!(qwen_token_plan_individual_should_handle_immediate_abort, "Qwen Token Plan Individual should handle immediate abort");
+    ignored_abort_test!(
+        qwen_token_plan_individual_should_abort_mid_stream,
+        "Qwen Token Plan Individual should abort mid-stream"
+    );
+    ignored_abort_test!(
+        qwen_token_plan_individual_should_handle_immediate_abort,
+        "Qwen Token Plan Individual should handle immediate abort"
+    );
 
     // Qwen Token Plan (CN)
-    ignored_abort_test!(qwen_token_plan_cn_should_abort_mid_stream, "Qwen Token Plan (CN) should abort mid-stream");
-    ignored_abort_test!(qwen_token_plan_cn_should_handle_immediate_abort, "Qwen Token Plan (CN) should handle immediate abort");
+    ignored_abort_test!(
+        qwen_token_plan_cn_should_abort_mid_stream,
+        "Qwen Token Plan (CN) should abort mid-stream"
+    );
+    ignored_abort_test!(
+        qwen_token_plan_cn_should_handle_immediate_abort,
+        "Qwen Token Plan (CN) should handle immediate abort"
+    );
 
     // Kimi For Coding
-    ignored_abort_test!(kimi_for_coding_should_abort_mid_stream, "Kimi For Coding should abort mid-stream");
-    ignored_abort_test!(kimi_for_coding_should_handle_immediate_abort, "Kimi For Coding should handle immediate abort");
+    ignored_abort_test!(
+        kimi_for_coding_should_abort_mid_stream,
+        "Kimi For Coding should abort mid-stream"
+    );
+    ignored_abort_test!(
+        kimi_for_coding_should_handle_immediate_abort,
+        "Kimi For Coding should handle immediate abort"
+    );
 
     // Vercel AI Gateway
-    ignored_abort_test!(vercel_ai_gateway_should_abort_mid_stream, "Vercel AI Gateway should abort mid-stream");
-    ignored_abort_test!(vercel_ai_gateway_should_handle_immediate_abort, "Vercel AI Gateway should handle immediate abort");
+    ignored_abort_test!(
+        vercel_ai_gateway_should_abort_mid_stream,
+        "Vercel AI Gateway should abort mid-stream"
+    );
+    ignored_abort_test!(
+        vercel_ai_gateway_should_handle_immediate_abort,
+        "Vercel AI Gateway should handle immediate abort"
+    );
 
     // OpenAI Codex
-    ignored_abort_test!(openai_codex_should_abort_mid_stream, "OpenAI Codex should abort mid-stream");
-    ignored_abort_test!(openai_codex_should_handle_immediate_abort, "OpenAI Codex should handle immediate abort");
+    ignored_abort_test!(
+        openai_codex_should_abort_mid_stream,
+        "OpenAI Codex should abort mid-stream"
+    );
+    ignored_abort_test!(
+        openai_codex_should_handle_immediate_abort,
+        "OpenAI Codex should handle immediate abort"
+    );
 
     // Amazon Bedrock (3 tests)
-    ignored_abort_test!(amazon_bedrock_should_abort_mid_stream, "Amazon Bedrock should abort mid-stream");
-    ignored_abort_test!(amazon_bedrock_should_handle_immediate_abort, "Amazon Bedrock should handle immediate abort");
-    ignored_abort_test!(amazon_bedrock_should_handle_abort_then_new_message, "Amazon Bedrock should handle abort then new message");
+    ignored_abort_test!(
+        amazon_bedrock_should_abort_mid_stream,
+        "Amazon Bedrock should abort mid-stream"
+    );
+    ignored_abort_test!(
+        amazon_bedrock_should_handle_immediate_abort,
+        "Amazon Bedrock should handle immediate abort"
+    );
+    ignored_abort_test!(
+        amazon_bedrock_should_handle_abort_then_new_message,
+        "Amazon Bedrock should handle abort then new message"
+    );
 }

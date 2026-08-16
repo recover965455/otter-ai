@@ -41,9 +41,7 @@ where
                 }
                 tokio::time::sleep(delay).await;
                 delay = std::cmp::min(
-                    Duration::from_millis(
-                        (delay.as_millis() as f64 * config.multiplier) as u64
-                    ),
+                    Duration::from_millis((delay.as_millis() as f64 * config.multiplier) as u64),
                     config.max_delay,
                 );
             }

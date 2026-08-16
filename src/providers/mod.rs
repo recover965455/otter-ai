@@ -2,17 +2,14 @@ use async_trait::async_trait;
 
 use crate::auth::types::{Credential, ProviderAuth};
 use crate::models_store::{ModelsStore, ModelsStoreEntry};
-use crate::types::{
-    ApiStreamOptions, Context, Model,
-    SimpleStreamOptions,
-};
+use crate::types::{ApiStreamOptions, Context, Model, SimpleStreamOptions};
 use crate::utils::event_stream::AssistantMessageEventStream;
 
+#[cfg(feature = "providers-anthropic")]
+pub mod anthropic;
 pub mod faux;
 #[cfg(feature = "providers-openai")]
 pub mod openai;
-#[cfg(feature = "providers-anthropic")]
-pub mod anthropic;
 
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +25,10 @@ pub trait RefreshModelsContext {
     fn allow_network(&self) -> bool;
     fn force(&self) -> bool;
     fn provider_id(&self) -> &str;
-    fn publish(&self, publication: ModelsPublication) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + Send + '_>>;
+    fn publish(
+        &self,
+        publication: ModelsPublication,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + Send + '_>>;
 }
 
 #[async_trait]
@@ -115,7 +115,10 @@ impl<'a> RefreshModelsContext for RefreshContext<'a> {
         &self.state.provider_id
     }
 
-    fn publish(&self, publication: ModelsPublication) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + Send + '_>> {
+    fn publish(
+        &self,
+        publication: ModelsPublication,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + Send + '_>> {
         Box::pin(async move {
             let provider_id = self.state.provider_id.clone();
             let store = self.state.models_store.clone();
