@@ -80,9 +80,9 @@ pub use auth::{
 
 // Re-exports from utils
 pub use utils::{
-    calculate_usage_cost, create_assistant_message_event_stream, parse_partial_json,
-    string_enum_schema, tool_from_schema, validate_tool_arguments, with_retry,
-    AssistantMessageEventStream, EventStream, RetryConfig,
+    calculate_usage_cost, config_dir, config_path, create_assistant_message_event_stream,
+    ensure_config_dir, parse_partial_json, string_enum_schema, tool_from_schema,
+    validate_tool_arguments, with_retry, AssistantMessageEventStream, EventStream, RetryConfig,
 };
 
 // Re-export schemars for schema generation (replaces TypeBox from TS)

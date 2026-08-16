@@ -7,15 +7,11 @@
 //! injected as static extra headers here, **or** the caller can override by
 //! passing their own Config instead of using the default constructor.
 
-use std::collections::HashMap;
-
-use super::openai_compat::{
-    build_compat_provider, CompatProviderSpec, GenericCompatConfig, GenericCompatProvider,
-};
+pub use super::openai_compat::GenericCompatConfig as CloudflareAiGatewayConfig;
+use super::openai_compat::{build_compat_provider, CompatProviderSpec, GenericCompatProvider};
 use crate::types::{Model, ModelCostRates, ModelThinkingLevel};
 
 pub type CloudflareAiGatewayProvider = GenericCompatProvider;
-pub use super::openai_compat::GenericCompatConfig as CloudflareAiGatewayConfig;
 
 pub fn cloudflare_ai_gateway_provider() -> CloudflareAiGatewayProvider {
     build_compat_provider(CompatProviderSpec {
