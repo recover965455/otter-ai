@@ -47,19 +47,31 @@ default = [
     "providers-openai",
     "providers-anthropic",
     "providers-faux",
+    "providers-ant-ling",
     "providers-azure",
+    "providers-baseten",
     "providers-bedrock",
     "providers-cerebras",
+    "providers-chatgpt-plus",
+    "providers-claude-pro-max",
     "providers-cloudflare-ai-gateway",
     "providers-cloudflare-workers-ai",
     "providers-deepseek",
+    "providers-fireworks",
+    "providers-github-copilot",
     "providers-google",
+    "providers-google-vertex",
     "providers-groq",
     "providers-mistral",
+    "providers-moonshot",
     "providers-nvidia",
     "providers-openrouter",
+    "providers-openrouter-oauth",
+    "providers-qwen-token-plan",
+    "providers-radius",
     "providers-vercel-ai-gateway",
     "providers-xai",
+    "providers-xai-subscription",
     "providers-zai",
 ]
 
@@ -103,3 +115,27 @@ providers-vercel-ai-gateway = []
 providers-xai = []
 # Enable ZAI / Codin provider.
 providers-zai = []
+# Enable Ant Ling (Ant Group coding assistant).
+providers-ant-ling = []
+# Enable Baseten managed inference.
+providers-baseten = []
+# Enable ChatGPT Plus/Pro (Codex) subscription OAuth provider.
+providers-chatgpt-plus = []
+# Enable Claude Pro/Max subscription OAuth provider.
+providers-claude-pro-max = []
+# Enable Fireworks AI inference.
+providers-fireworks = []
+# Enable GitHub Copilot subscription OAuth provider (device-code flow).
+providers-github-copilot = []
+# Enable Google Vertex AI (enterprise Google Cloud LLM).
+providers-google-vertex = []
+# Enable Moonshot AI / Kimi Coding.
+providers-moonshot = []
+# Enable OpenRouter OAuth (PKCE, mints user-controlled API key).
+providers-openrouter-oauth = []
+# Enable Qwen Token Plan Individual.
+providers-qwen-token-plan = []
+# Enable Radius (pi-messages gateway).
+providers-radius = []
+# Enable xAI subscription (Grok/X subscription, device OAuth).
+providers-xai-subscription = []

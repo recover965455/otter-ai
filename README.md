@@ -52,19 +52,31 @@ otter-ai = "0.1"
 | `providers-openai` | ✅ | OpenAI（GPT-4o / GPT-4o Mini / o1 / o3-mini，Chat Completions + Responses API） |
 | `providers-anthropic` | ✅ | Anthropic（Claude 3 Opus / 3.5 Sonnet / 3.7 Sonnet，Messages API + 缓存定价） |
 | `providers-faux` | ✅ | Faux Mock 提供商（用于离线测试、确定性单元测试） |
+| `providers-ant-ling` | ✅ | Ant Ling（蚂蚁集团 AI 编程助手） |
 | `providers-azure` | ✅ | Azure OpenAI Responses（`AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT`） |
+| `providers-baseten` | ✅ | Baseten 托管推理平台 |
 | `providers-bedrock` | ✅ | Amazon Bedrock（ConverseStream 协议 + SigV4 Bearer Token） |
 | `providers-cerebras` | ✅ | Cerebras 极速推理（Llama 系列） |
+| `providers-chatgpt-plus` | ✅ | ChatGPT Plus/Pro (Codex) 订阅 OAuth |
+| `providers-claude-pro-max` | ✅ | Claude Pro/Max 订阅 OAuth |
 | `providers-cloudflare-ai-gateway` | ✅ | Cloudflare AI Gateway（聚合代理） |
 | `providers-cloudflare-workers-ai` | ✅ | Cloudflare Workers AI（边缘推理，`@cf/*` 模型） |
 | `providers-deepseek` | ✅ | DeepSeek V3 Chat + R1 Reasoner |
+| `providers-fireworks` | ✅ | Fireworks AI 高速推理 |
+| `providers-github-copilot` | ✅ | GitHub Copilot 订阅 OAuth（device-code flow） |
 | `providers-google` | ✅ | Google Generative AI（Gemini 2.5 Pro / 2.0 Flash 等） |
+| `providers-google-vertex` | ✅ | Google Vertex AI（企业级 Google Cloud LLM） |
 | `providers-groq` | ✅ | Groq 极速推理（Llama / Mixtral 系列） |
 | `providers-mistral` | ✅ | Mistral / Codestral |
+| `providers-moonshot` | ✅ | Moonshot AI / Kimi Coding |
 | `providers-nvidia` | ✅ | NVIDIA NIM（`integrate.api.nvidia.com/v1`） |
 | `providers-openrouter` | ✅ | OpenRouter 聚合网关（自动注入 `HTTP-Referer` / `X-Title` 头） |
+| `providers-openrouter-oauth` | ✅ | OpenRouter OAuth（PKCE，铸造用户可控 API Key） |
+| `providers-qwen-token-plan` | ✅ | Qwen Token Plan Individual（千问国际版） |
+| `providers-radius` | ✅ | Radius（pi-messages 网关） |
 | `providers-vercel-ai-gateway` | ✅ | Vercel AI Gateway（代理 + 监控） |
 | `providers-xai` | ✅ | xAI（Grok 3 / 4 系列） |
+| `providers-xai-subscription` | ✅ | xAI 订阅（Grok/X subscription，device OAuth） |
 | `providers-zai` | ✅ | ZAI / Codin |
 
 只启用 OpenAI 的示例：
@@ -89,21 +101,33 @@ SDK 会自动从环境变量读取各提供商的凭证（与 `@earendil-works/p
 | | `OPENAI_ORG_ID` | （可选）组织 ID |
 | **Anthropic** | `ANTHROPIC_API_KEY` | Anthropic API Key |
 | | `ANTHROPIC_BASE_URL` | （可选）自定义 API Base URL |
+| **Ant Ling** | `ANT_LING_API_KEY` | Ant Ling API Key |
 | **Azure OpenAI** | `AZURE_OPENAI_API_KEY` | Azure API Key |
 | | `AZURE_OPENAI_ENDPOINT` | Azure 端点 URL |
+| **Baseten** | `BASETEN_API_KEY` | Baseten API Key |
 | **Amazon Bedrock** | `AWS_BEARER_TOKEN_BEDROCK` | 已签名的 Bedrock ConverseStream Bearer Token |
 | **Cerebras** | `CEREBRAS_API_KEY` | Cerebras API Key |
+| **ChatGPT Plus/Pro (Codex)** | — | 订阅型，通过 `/login` OAuth 授权，无需环境变量 |
+| **Claude Pro/Max** | — | 订阅型，通过 `/login` OAuth 授权，无需环境变量 |
 | **Cloudflare** | `CLOUDFLARE_API_KEY` | （Cloudflare AI Gateway **和** Workers AI 共用） |
 | | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账号 ID（嵌入 URL path） |
 | | `CLOUDFLARE_GATEWAY_ID` | （仅 AI Gateway）网关实例 ID |
 | **DeepSeek** | `DEEPSEEK_API_KEY` | DeepSeek API Key |
+| **Fireworks AI** | `FIREWORKS_API_KEY` | Fireworks AI API Key |
+| **GitHub Copilot** | — | 订阅型，通过 `/login` device-code OAuth 授权 |
 | **Google Gemini** | `GEMINI_API_KEY` | Google Generative AI API Key（aistudio.google.com） |
+| **Google Vertex AI** | `GOOGLE_APPLICATION_CREDENTIALS` | Google Cloud 服务账号凭证 JSON 路径（或 `gcloud auth print-access-token` 生成的 token） |
 | **Groq** | `GROQ_API_KEY` | Groq API Key（以 `gsk_` 开头） |
 | **Mistral** | `MISTRAL_API_KEY` | Mistral API Key（以 `trMZ` 开头） |
+| **Moonshot AI (Kimi)** | `MOONSHOT_API_KEY` | Moonshot AI API Key |
 | **NVIDIA NIM** | `NVIDIA_API_KEY` | NVIDIA NIM API Key（以 `nvapi-` 开头） |
 | **OpenRouter** | `OPENROUTER_API_KEY` | OpenRouter API Key |
+| **OpenRouter (OAuth)** | — | OAuth 授权铸造 API Key，无需环境变量（`OPENROUTER_API_KEY` 仍可用于 API Key 模式） |
+| **Qwen Token Plan** | `QWEN_TOKEN_PLAN_API_KEY` | 千问国际版 API Key |
+| **Radius** | — | 订阅型，通过 `/login` OAuth 授权，无需环境变量 |
 | **Vercel AI Gateway** | `AI_GATEWAY_API_KEY` | Vercel 颁发的 Key |
 | **xAI** | `XAI_API_KEY` | xAI（Grok）API Key |
+| **xAI (subscription)** | — | 订阅型，通过 `/login` device-code OAuth 授权（`XAI_API_KEY` 仍可用于 API Key 模式） |
 | **ZAI / Codin** | `ZAI_API_KEY` | ZAI API Key |
 
 也可以通过 `CredentialStore` trait 实现自定义凭证来源。

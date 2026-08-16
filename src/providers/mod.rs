@@ -6,18 +6,27 @@ use crate::types::{ApiStreamOptions, Context, Model, SimpleStreamOptions};
 use crate::utils::event_stream::AssistantMessageEventStream;
 
 // Shared primitives used by most providers below.
+pub mod oauth_compat;
 pub mod openai_compat;
 
 // Built-in providers (opt-in at compile time via feature flags; "faux" is
 // always available because it's the test mock everyone builds on top of).
+#[cfg(feature = "providers-ant-ling")]
+pub mod ant_ling;
 #[cfg(feature = "providers-anthropic")]
 pub mod anthropic;
 #[cfg(feature = "providers-azure")]
 pub mod azure;
+#[cfg(feature = "providers-baseten")]
+pub mod baseten;
 #[cfg(feature = "providers-bedrock")]
 pub mod bedrock;
 #[cfg(feature = "providers-cerebras")]
 pub mod cerebras;
+#[cfg(feature = "providers-chatgpt-plus")]
+pub mod chatgpt_plus;
+#[cfg(feature = "providers-claude-pro-max")]
+pub mod claude_pro_max;
 #[cfg(feature = "providers-cloudflare-ai-gateway")]
 pub mod cloudflare_ai_gateway;
 #[cfg(feature = "providers-cloudflare-workers-ai")]
@@ -25,22 +34,38 @@ pub mod cloudflare_workers_ai;
 #[cfg(feature = "providers-deepseek")]
 pub mod deepseek;
 pub mod faux;
+#[cfg(feature = "providers-fireworks")]
+pub mod fireworks;
+#[cfg(feature = "providers-github-copilot")]
+pub mod github_copilot;
 #[cfg(feature = "providers-google")]
 pub mod google;
+#[cfg(feature = "providers-google-vertex")]
+pub mod google_vertex;
 #[cfg(feature = "providers-groq")]
 pub mod groq;
 #[cfg(feature = "providers-mistral")]
 pub mod mistral;
+#[cfg(feature = "providers-moonshot")]
+pub mod moonshot;
 #[cfg(feature = "providers-nvidia")]
 pub mod nvidia;
 #[cfg(feature = "providers-openai")]
 pub mod openai;
 #[cfg(feature = "providers-openrouter")]
 pub mod openrouter;
+#[cfg(feature = "providers-openrouter-oauth")]
+pub mod openrouter_oauth;
+#[cfg(feature = "providers-qwen-token-plan")]
+pub mod qwen_token_plan;
+#[cfg(feature = "providers-radius")]
+pub mod radius;
 #[cfg(feature = "providers-vercel-ai-gateway")]
 pub mod vercel_ai_gateway;
 #[cfg(feature = "providers-xai")]
 pub mod xai;
+#[cfg(feature = "providers-xai-subscription")]
+pub mod xai_subscription;
 #[cfg(feature = "providers-zai")]
 pub mod zai;
 
