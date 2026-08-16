@@ -2,8 +2,21 @@
 name = "otter-ai"
 version = "0.1.0"
 edition = "2021"
-description = "Unified LLM API with provider collections, automatic auth resolution, token and cost tracking"
-license = "MIT"
+rust-version = "1.75"
+description = "Unified LLM API with provider collections, automatic auth resolution, token and cost tracking, and context persistence"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/earendil-works/otter-ai"
+homepage = "https://github.com/earendil-works/otter-ai"
+documentation = "https://docs.rs/otter-ai"
+keywords = ["llm", "ai", "gpt", "openai", "anthropic"]
+categories = ["api-bindings", "asynchronous", "web-programming"]
+authors = ["Earendil Works <hello@earendil.works>"]
+exclude = [
+    ".github/",
+    "tests/",
+    ".gitignore",
+]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -31,6 +44,14 @@ tokio-test = "0.4"
 
 [features]
 default = ["providers-openai", "providers-anthropic", "providers-faux"]
+
+## Provider integrations
+
+# Enable OpenAI-compatible provider (OpenAI, Azure OpenAI, etc.)
 providers-openai = []
+
+# Enable Anthropic provider (Claude models)
 providers-anthropic = []
+
+# Enable Faux provider (mock provider for testing)
 providers-faux = []
