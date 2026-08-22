@@ -25,6 +25,14 @@ use crate::utils::event_stream::AssistantMessageEventStream;
 // Config
 // ---------------------------------------------------------------------------
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthTokenRequestEncoding {
+    #[default]
+    FormUrlEncoded,
+    Json,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OAuthProviderConfig {
     pub base_url: String,
@@ -52,6 +60,10 @@ pub struct OAuthProviderConfig {
     /// Extra static headers to inject on every request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extra_headers: Option<ProviderHeaders>,
+    #[serde(default)]
+    pub token_request_encoding: OAuthTokenRequestEncoding,
+    #[serde(default)]
+    pub include_state_in_token_exchange: bool,
     pub default_models: Vec<Model>,
 }
 
@@ -181,17 +193,42 @@ impl GenericOAuthAuth {
         let token_url = self.config.token_url.as_deref().ok_or_else(|| {
             anyhow::anyhow!("No token URL configured for {}", self.config.display_name)
         })?;
-        let response = reqwest::Client::new()
-            .post(token_url)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(format!(
-                "grant_type=authorization_code&client_id={}&code={}&code_verifier={}&redirect_uri={}",
-                urlencode(&self.config.client_id),
-                urlencode(&code),
-                urlencode(&verifier),
-                urlencode(redirect_uri),
-            ))
-            .send()
+        let client = reqwest::Client::new();
+        let mut json_body = serde_json::json!({
+            "grant_type": "authorization_code",
+            "client_id": self.config.client_id,
+            "code": code,
+            "code_verifier": verifier,
+            "redirect_uri": redirect_uri,
+        });
+        if self.config.include_state_in_token_exchange {
+            json_body["state"] = serde_json::Value::String(state.clone());
+        }
+        let response = match self.config.token_request_encoding {
+            OAuthTokenRequestEncoding::FormUrlEncoded => {
+                let mut body = format!(
+                    "grant_type=authorization_code&client_id={}&code={}&code_verifier={}&redirect_uri={}",
+                    urlencode(&self.config.client_id),
+                    urlencode(&code),
+                    urlencode(&verifier),
+                    urlencode(redirect_uri),
+                );
+                if self.config.include_state_in_token_exchange {
+                    body.push_str("&state=");
+                    body.push_str(&urlencode(&state));
+                }
+                client
+                    .post(token_url)
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .body(body)
+                    .send()
+            }
+            OAuthTokenRequestEncoding::Json => client
+                .post(token_url)
+                .header("Content-Type", "application/json")
+                .json(&json_body)
+                .send(),
+        }
             .await
             .map_err(|e| anyhow::anyhow!("{} token exchange error: {}", self.config.display_name, e))?;
 
@@ -341,15 +378,27 @@ impl OAuthAuth for GenericOAuthAuth {
         }
 
         let client = reqwest::Client::new();
-        let response = client
-            .post(token_url)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(format!(
-                "grant_type=refresh_token&refresh_token={}&client_id={}",
-                urlencode(&credential.inner.refresh),
-                urlencode(&self.config.client_id),
-            ))
-            .send()
+        let json_body = serde_json::json!({
+            "grant_type": "refresh_token",
+            "refresh_token": credential.inner.refresh,
+            "client_id": self.config.client_id,
+        });
+        let response = match self.config.token_request_encoding {
+            OAuthTokenRequestEncoding::FormUrlEncoded => client
+                .post(token_url)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .body(format!(
+                    "grant_type=refresh_token&refresh_token={}&client_id={}",
+                    urlencode(&credential.inner.refresh),
+                    urlencode(&self.config.client_id),
+                ))
+                .send(),
+            OAuthTokenRequestEncoding::Json => client
+                .post(token_url)
+                .header("Content-Type", "application/json")
+                .json(&json_body)
+                .send(),
+        }
             .await
             .map_err(|e| {
                 anyhow::anyhow!("{} token refresh error: {}", self.config.display_name, e)
@@ -862,6 +911,8 @@ pub struct OAuthProviderSpec<'a> {
     pub api_label: &'a str,
     pub default_models_fn: fn() -> Vec<Model>,
     pub extra_headers: Option<ProviderHeaders>,
+    pub token_request_encoding: OAuthTokenRequestEncoding,
+    pub include_state_in_token_exchange: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -893,6 +944,8 @@ pub fn build_oauth_provider(spec: OAuthProviderSpec) -> GenericOAuthProvider {
             login_label: spec.login_label.map(|s| s.to_string()),
             api_label: spec.api_label.to_string(),
             extra_headers: spec.extra_headers,
+            token_request_encoding: spec.token_request_encoding,
+            include_state_in_token_exchange: spec.include_state_in_token_exchange,
             default_models: models,
         },
     )

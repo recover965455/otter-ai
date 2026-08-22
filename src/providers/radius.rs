@@ -3,7 +3,9 @@
 //! cached in `models-store.json`.  Custom Radius gateways can be declared in
 //! `models.json` with `"oauth": "radius"` and a gateway `baseUrl`.
 
-use super::oauth_compat::{build_oauth_provider, GenericOAuthProvider, OAuthProviderSpec};
+use super::oauth_compat::{
+    build_oauth_provider, GenericOAuthProvider, OAuthProviderSpec, OAuthTokenRequestEncoding,
+};
 
 pub type RadiusProvider = GenericOAuthProvider;
 
@@ -24,6 +26,8 @@ pub fn radius_provider() -> RadiusProvider {
         api_label: "pi-messages",
         default_models_fn: default_models,
         extra_headers: None,
+        token_request_encoding: OAuthTokenRequestEncoding::FormUrlEncoded,
+        include_state_in_token_exchange: false,
     })
 }
 

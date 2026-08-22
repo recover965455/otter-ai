@@ -6,7 +6,9 @@
 //! `OPENROUTER_API_KEY` remains available through the API-key OpenRouter
 //! provider for non-OAuth usage.
 
-use super::oauth_compat::{build_oauth_provider, GenericOAuthProvider, OAuthProviderSpec};
+use super::oauth_compat::{
+    build_oauth_provider, GenericOAuthProvider, OAuthProviderSpec, OAuthTokenRequestEncoding,
+};
 
 pub type OpenRouterOauthProvider = GenericOAuthProvider;
 
@@ -27,6 +29,8 @@ pub fn openrouter_oauth_provider() -> OpenRouterOauthProvider {
         api_label: "openai-chat-completions",
         default_models_fn: default_models,
         extra_headers: None,
+        token_request_encoding: OAuthTokenRequestEncoding::FormUrlEncoded,
+        include_state_in_token_exchange: false,
     })
 }
 

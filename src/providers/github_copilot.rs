@@ -2,7 +2,9 @@
 //! device-code flow.  Press Enter for github.com, or enter your GitHub
 //! Enterprise Server domain during login.
 
-use super::oauth_compat::{build_oauth_provider, GenericOAuthProvider, OAuthProviderSpec};
+use super::oauth_compat::{
+    build_oauth_provider, GenericOAuthProvider, OAuthProviderSpec, OAuthTokenRequestEncoding,
+};
 
 pub type GitHubCopilotProvider = GenericOAuthProvider;
 
@@ -23,6 +25,8 @@ pub fn github_copilot_provider() -> GitHubCopilotProvider {
         api_label: "openai-chat-completions",
         default_models_fn: default_models,
         extra_headers: None,
+        token_request_encoding: OAuthTokenRequestEncoding::FormUrlEncoded,
+        include_state_in_token_exchange: false,
     })
 }
 

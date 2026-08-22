@@ -7,7 +7,9 @@
 //! [`crate::providers::openai_responses`]). The `client_id` below matches
 //! pi-ai's `loadOpenAICodexOAuth` (`auth/oauth/openai-codex.ts`).
 
-use super::oauth_compat::{build_oauth_provider, GenericOAuthProvider, OAuthProviderSpec};
+use super::oauth_compat::{
+    build_oauth_provider, GenericOAuthProvider, OAuthProviderSpec, OAuthTokenRequestEncoding,
+};
 
 pub type ChatGptPlusProvider = GenericOAuthProvider;
 
@@ -28,6 +30,8 @@ pub fn chatgpt_plus_provider() -> ChatGptPlusProvider {
         api_label: "openai-codex-responses",
         default_models_fn: default_models,
         extra_headers: None,
+        token_request_encoding: OAuthTokenRequestEncoding::FormUrlEncoded,
+        include_state_in_token_exchange: false,
     })
 }
 

@@ -2,7 +2,9 @@
 //! `XAI_API_KEY` remains available through the API-key xAI provider for
 //! non-subscription usage.
 
-use super::oauth_compat::{build_oauth_provider, GenericOAuthProvider, OAuthProviderSpec};
+use super::oauth_compat::{
+    build_oauth_provider, GenericOAuthProvider, OAuthProviderSpec, OAuthTokenRequestEncoding,
+};
 
 pub type XaiSubscriptionProvider = GenericOAuthProvider;
 
@@ -23,6 +25,8 @@ pub fn xai_subscription_provider() -> XaiSubscriptionProvider {
         api_label: "openai-chat-completions",
         default_models_fn: default_models,
         extra_headers: None,
+        token_request_encoding: OAuthTokenRequestEncoding::FormUrlEncoded,
+        include_state_in_token_exchange: false,
     })
 }
 

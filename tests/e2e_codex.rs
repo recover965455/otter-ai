@@ -17,6 +17,7 @@ use otter_ai::auth::{
 use otter_ai::models::Models;
 use otter_ai::providers::oauth_compat::{
     build_oauth_provider, GenericOAuthAuth, OAuthProviderConfig, OAuthProviderSpec,
+    OAuthTokenRequestEncoding,
 };
 use otter_ai::providers::openai_responses::{
     build_request_body, stream_codex, CodexStreamOptions, CodexTransport,
@@ -1400,6 +1401,8 @@ fn test_spec(token_url: String, base_url: String) -> OAuthProviderSpec<'static> 
         api_label: "openai-codex-responses",
         default_models_fn: || vec![],
         extra_headers: None,
+        token_request_encoding: OAuthTokenRequestEncoding::FormUrlEncoded,
+        include_state_in_token_exchange: false,
     }
 }
 
@@ -1417,6 +1420,8 @@ fn config_from_spec(spec: &OAuthProviderSpec<'static>) -> OAuthProviderConfig {
         login_label: spec.login_label.map(|s| s.to_string()),
         api_label: spec.api_label.to_string(),
         extra_headers: None,
+        token_request_encoding: spec.token_request_encoding,
+        include_state_in_token_exchange: spec.include_state_in_token_exchange,
         default_models: vec![],
     }
 }
@@ -1506,6 +1511,62 @@ async fn refreshes_expired_tokens_through_the_token_endpoint() {
             .and_then(|v| v.as_str()),
         Some("acc_new")
     );
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn refreshes_expired_tokens_with_json_token_requests_when_configured() {
+    let new_access = mock_token("acc_claude_new");
+    let server = MockServer::spawn(Arc::new(move |req| {
+        assert_eq!(req.method, "POST");
+        assert_eq!(req.header("content-type"), Some("application/json"));
+        let body = req.json_body();
+        assert_eq!(body["grant_type"], "refresh_token");
+        assert_eq!(body["client_id"], "9d1c250a-e61b-44d9-88ed-5944d1962f5e");
+        assert_eq!(body["refresh_token"], "refresh-token-1");
+        MockResponse::json(
+            200,
+            serde_json::json!({
+                "access_token": new_access,
+                "refresh_token": "refresh-token-2",
+                "expires_in": 3600,
+            }),
+        )
+    }))
+    .await;
+
+    let auth = GenericOAuthAuth::new(OAuthProviderConfig {
+        base_url: "https://api.anthropic.com/v1".to_string(),
+        client_id: "9d1c250a-e61b-44d9-88ed-5944d1962f5e".to_string(),
+        scopes: vec![
+            "org:create_api_key".to_string(),
+            "user:profile".to_string(),
+            "user:inference".to_string(),
+        ],
+        auth_url: Some("https://claude.ai/oauth/authorize".to_string()),
+        token_url: Some(server.url()),
+        device_auth_url: None,
+        redirect_uri: Some("https://console.anthropic.com/oauth/code/callback".to_string()),
+        display_name: "Claude Pro/Max".to_string(),
+        is_subscription: true,
+        login_label: Some("Claude Pro/Max".to_string()),
+        api_label: "anthropic-messages".to_string(),
+        extra_headers: None,
+        token_request_encoding: OAuthTokenRequestEncoding::Json,
+        include_state_in_token_exchange: true,
+        default_models: vec![],
+    });
+
+    let refreshed = auth
+        .refresh(
+            &expired_oauth_credential(),
+            &otter_ai::CancellationToken::new(),
+        )
+        .await
+        .expect("refresh succeeds");
+
+    assert_eq!(refreshed.inner.access, mock_token("acc_claude_new"));
+    assert_eq!(refreshed.inner.refresh, "refresh-token-2");
     server.shutdown();
 }
 
@@ -2846,6 +2907,32 @@ mod browser_login {
             login_label: Some("ChatGPT Plus/Pro".to_string()),
             api_label: "openai-codex-responses".to_string(),
             extra_headers: None,
+            token_request_encoding: OAuthTokenRequestEncoding::FormUrlEncoded,
+            include_state_in_token_exchange: false,
+            default_models: vec![],
+        }
+    }
+
+    fn claude_auth_config(token_url: String) -> OAuthProviderConfig {
+        OAuthProviderConfig {
+            base_url: "https://api.anthropic.com/v1".to_string(),
+            client_id: "9d1c250a-e61b-44d9-88ed-5944d1962f5e".to_string(),
+            scopes: vec![
+                "org:create_api_key".into(),
+                "user:profile".into(),
+                "user:inference".into(),
+            ],
+            auth_url: Some("https://claude.ai/oauth/authorize".to_string()),
+            token_url: Some(token_url),
+            device_auth_url: None,
+            redirect_uri: Some("https://console.anthropic.com/oauth/code/callback".to_string()),
+            display_name: "Claude Pro/Max".to_string(),
+            is_subscription: true,
+            login_label: Some("Claude Pro/Max".to_string()),
+            api_label: "anthropic-messages".to_string(),
+            extra_headers: None,
+            token_request_encoding: OAuthTokenRequestEncoding::Json,
+            include_state_in_token_exchange: true,
             default_models: vec![],
         }
     }
@@ -3042,6 +3129,46 @@ mod browser_login {
                 .map(|s| s.as_str()),
             Some("cb-code-1")
         );
+        token_server.shutdown();
+    }
+
+    #[tokio::test]
+    async fn browser_login_uses_json_token_exchange_when_configured() {
+        let token_server = MockServer::spawn(Arc::new(|req: &RecordedRequest| {
+            assert_eq!(req.method, "POST");
+            assert_eq!(req.header("content-type"), Some("application/json"));
+            let body = req.json_body();
+            assert_eq!(body["grant_type"], "authorization_code");
+            assert_eq!(body["client_id"], "9d1c250a-e61b-44d9-88ed-5944d1962f5e");
+            assert_eq!(
+                body["redirect_uri"],
+                "https://console.anthropic.com/oauth/code/callback"
+            );
+            assert!(body.get("code").is_some());
+            assert!(body.get("code_verifier").is_some());
+            assert!(body.get("state").is_some());
+            MockResponse::json(200, token_response_json("acc_browser_json"))
+        }))
+        .await;
+
+        let interaction = TestInteraction::new("");
+        let gate = interaction.gate();
+        let auth = GenericOAuthAuth::new(claude_auth_config(token_server.url()));
+
+        let interaction_for_task = interaction.clone();
+        let login_task = tokio::spawn(async move { auth.login(&interaction_for_task).await });
+
+        let auth_url = interaction.auth_url().await;
+        let real_state = query_params(&auth_url).get("state").cloned().unwrap();
+        interaction.set_answer(format!("auth-code-json#{}", real_state));
+        gate.send(()).expect("release manual prompt");
+
+        let credential: OAuthCredential = login_task.await.expect("task").expect("login succeeds");
+        assert_eq!(credential.inner.access, mock_access_token("acc_browser_json"));
+
+        let exchanged: &RecordedRequest = &token_server.recorded()[0];
+        assert_eq!(exchanged.json_body()["code"], "auth-code-json");
+        assert_eq!(exchanged.json_body()["state"], real_state);
         token_server.shutdown();
     }
 
