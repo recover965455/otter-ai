@@ -399,10 +399,8 @@ impl OAuthAuth for GenericOAuthAuth {
                 .json(&json_body)
                 .send(),
         }
-            .await
-            .map_err(|e| {
-                anyhow::anyhow!("{} token refresh error: {}", self.config.display_name, e)
-            })?;
+        .await
+        .map_err(|e| anyhow::anyhow!("{} token refresh error: {}", self.config.display_name, e))?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

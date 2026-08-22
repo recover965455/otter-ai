@@ -3164,7 +3164,10 @@ mod browser_login {
         gate.send(()).expect("release manual prompt");
 
         let credential: OAuthCredential = login_task.await.expect("task").expect("login succeeds");
-        assert_eq!(credential.inner.access, mock_access_token("acc_browser_json"));
+        assert_eq!(
+            credential.inner.access,
+            mock_access_token("acc_browser_json")
+        );
 
         let exchanged: &RecordedRequest = &token_server.recorded()[0];
         assert_eq!(exchanged.json_body()["code"], "auth-code-json");
